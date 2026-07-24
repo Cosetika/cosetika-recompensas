@@ -102,7 +102,11 @@ async function sincronizarWoo() {
     while (pagina <= 30) {
       const url = `${WC_URL}/wp-json/wc/v3/products?status=publish&per_page=100&page=${pagina}` +
         `&consumer_key=${encodeURIComponent(WC_KEY)}&consumer_secret=${encodeURIComponent(WC_SECRET)}`;
-      const resp = await fetch(url, { headers: { 'Accept': 'application/json', 'User-Agent': 'CosetikaRecompensas/1.0' } });
+      const resp = await fetch(url, { headers: {
+        'Accept': 'application/json',
+        'Accept-Language': 'es-EC,es;q=0.9',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+      } });
       if (!resp.ok) { wooUltimoError = `HTTP ${resp.status} al consultar productos`; break; }
       const prods = await resp.json();
       if (!Array.isArray(prods) || prods.length === 0) break;
