@@ -364,6 +364,7 @@ async function initDB() {
         nivel VARCHAR(10) NOT NULL DEFAULT 'ver', -- 'ver' | 'crear'
         actualizado_at TIMESTAMP DEFAULT NOW()
       );
+      ALTER TABLE recompensas_permisos ADD COLUMN IF NOT EXISTS ver_claves BOOLEAN DEFAULT false;
     `);
     console.log('✓ Tablas recompensas_* listas');
   } catch(e) { console.error('Error initDB:', e.message); }
@@ -418,8 +419,8 @@ const server = http.createServer(async (req, res) => {
       if (rU.rows.length) {
         const u = rU.rows[0];
         if (u.rol === 'admin') { json(res, 200, { ok:true, tipo:'admin', nombre: u.nombre }); return; }
-        const rP = await pool.query('SELECT nivel FROM recompensas_permisos WHERE usuario_id=$1', [u.id]);
-        if (rP.rows.length) { json(res, 200, { ok:true, tipo:'staff', nivel: rP.rows[0].nivel, nombre: u.nombre }); return; }
+        const rP = await pool.query('SELECT nivel, ver_claves FROM recompensas_permisos WHERE usuario_id=$1', [u.id]);
+        if (rP.rows.length) { json(res, 200, { ok:true, tipo:'staff', nivel: rP.rows[0].nivel, ver_claves: !!rP.rows[0].ver_claves, nombre: u.nombre }); return; }
         json(res, 401, { ok:false, error:'Tu usuario aún no tiene acceso al Plan de Recompensas — pídeselo a Fernando' });
         return;
       }
@@ -436,24 +437,34 @@ const server = http.createServer(async (req, res) => {
   // ── ADMIN: equipo con acceso a Recompensas ──
   if (urlPath === '/api/admin/equipo' && req.method === 'GET') {
     const r = await pool.query(`
-      SELECT u.id, u.nombre, u.usuario, u.rol, p.nivel
+      SELECT u.id, u.nombre, u.usuario, u.rol, p.nivel, p.ver_claves
       FROM usuarios u
       LEFT JOIN recompensas_permisos p ON p.usuario_id = u.id
       WHERE u.activo=true AND u.rol != 'admin'
       ORDER BY u.nombre`);
-    json(res, 200, r.rows.map(x => ({ ...x, nivel: x.nivel || 'ninguno' })));
+    json(res, 200, r.rows.map(x => ({ ...x, nivel: x.nivel || 'ninguno', ver_claves: !!x.ver_claves })));
     return;
   }
   if (urlPath === '/api/admin/equipo' && req.method === 'POST') {
-    const { usuario_id, nivel } = await bodyJSON(req);
-    if (!usuario_id || !['ninguno','ver','crear'].includes(nivel)) { json(res, 400, { ok:false, error:'Datos inválidos' }); return; }
-    if (nivel === 'ninguno') {
-      await pool.query('DELETE FROM recompensas_permisos WHERE usuario_id=$1', [usuario_id]);
-    } else {
+    const { usuario_id, nivel, ver_claves } = await bodyJSON(req);
+    if (!usuario_id) { json(res, 400, { ok:false, error:'Datos inválidos' }); return; }
+    if (nivel !== undefined) {
+      if (!['ninguno','ver','crear'].includes(nivel)) { json(res, 400, { ok:false, error:'Nivel inválido' }); return; }
+      if (nivel === 'ninguno') {
+        await pool.query('DELETE FROM recompensas_permisos WHERE usuario_id=$1', [usuario_id]);
+      } else {
+        await pool.query(
+          `INSERT INTO recompensas_permisos(usuario_id, nivel) VALUES($1,$2)
+           ON CONFLICT(usuario_id) DO UPDATE SET nivel=$2, actualizado_at=NOW()`,
+          [usuario_id, nivel]);
+      }
+    }
+    if (ver_claves !== undefined) {
+      // Si aún no tiene fila de permiso, se crea con nivel 'ver' por defecto
       await pool.query(
-        `INSERT INTO recompensas_permisos(usuario_id, nivel) VALUES($1,$2)
-         ON CONFLICT(usuario_id) DO UPDATE SET nivel=$2, actualizado_at=NOW()`,
-        [usuario_id, nivel]);
+        `INSERT INTO recompensas_permisos(usuario_id, nivel, ver_claves) VALUES($1,'ver',$2)
+         ON CONFLICT(usuario_id) DO UPDATE SET ver_claves=$2, actualizado_at=NOW()`,
+        [usuario_id, !!ver_claves]);
     }
     json(res, 200, { ok:true });
     return;

@@ -177,6 +177,7 @@ function render(){
 // ═══════════════════ ADMIN / EQUIPO ═══════════════════
 function esAdmin(){ return sesion && sesion.tipo==='admin'; }
 function puedeCrear(){ return esAdmin() || (sesion && sesion.tipo==='staff' && sesion.nivel==='crear'); }
+function puedeVerClaves(){ return esAdmin() || (sesion && sesion.tipo==='staff' && sesion.ver_claves); }
 
 function tabsAdmin(){
   const t = [
@@ -253,7 +254,7 @@ async function renderAdmin(){
           <div style="font-size:12px;color:var(--muted);line-height:1.8">
             RUC/Cédula: <b style="color:var(--text)">${d.cliente.ruc}</b><br>
             Contacto: <b style="color:var(--text)">${d.cliente.contacto||'—'}</b> · Ciudad: <b style="color:var(--text)">${d.cliente.ciudad||'—'}</b><br>
-            Usuario de acceso: <b style="color:var(--text)">${d.cliente.usuario}</b>${esAdmin()?` · Clave: <b style="color:var(--brown)" id="clave-cli" data-clave="${(d.cliente.password||'').replace(/"/g,'&quot;')}">••••</b>
+            Usuario de acceso: <b style="color:var(--text)">${d.cliente.usuario}</b>${puedeVerClaves()?` · Clave: <b style="color:var(--brown)" id="clave-cli" data-clave="${(d.cliente.password||'').replace(/"/g,'&quot;')}">••••</b>
             <a href="#" onclick="event.preventDefault();const e=document.getElementById('clave-cli');e.textContent=e.textContent==='••••'?e.dataset.clave:'••••'" style="font-size:11px;color:var(--brown)">(ver)</a>`:''}<br>
             Compras cuentan desde: <b style="color:var(--text)">${fmtFecha(d.cliente.desde)}</b>
           </div>
@@ -350,7 +351,8 @@ async function renderAdmin(){
           <p style="font-size:11px;color:var(--muted);margin-bottom:10px">
             Entran con su mismo usuario y contraseña del dashboard.
             <b>Solo ver</b>: consulta clientes, saldos y canjes. <b>Ver y crear</b>: además crea clientes del plan.
-            Aprobar canjes y ver claves sigue siendo solo tuyo.
+            La casilla <b>🔑 claves</b> permite a esa persona ver la clave de los clientes.
+            Aprobar canjes sigue siendo solo tuyo.
           </p>
           ${equipo.map(u=>`
             <div class="mov">
@@ -359,6 +361,9 @@ async function renderAdmin(){
                 <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.nombre}</div>
                 <div style="font-size:10px;color:var(--muted)">@${u.usuario} · ${u.rol}</div>
               </div>
+              <label style="display:flex;align-items:center;gap:3px;font-size:10px;color:var(--muted);cursor:pointer;white-space:nowrap" title="Puede ver las claves de los clientes">
+                <input type="checkbox" ${u.ver_claves?'checked':''} onchange="cambiarClavesEquipo(${u.id}, this.checked)" style="accent-color:var(--brown);width:15px;height:15px;cursor:pointer"/>🔑
+              </label>
               <select onchange="cambiarNivelEquipo(${u.id}, this.value)" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:12px;outline:none;background:#fff;cursor:pointer">
                 <option value="ninguno" ${u.nivel==='ninguno'?'selected':''}>Sin acceso</option>
                 <option value="ver" ${u.nivel==='ver'?'selected':''}>Solo ver</option>
@@ -426,6 +431,14 @@ async function cambiarNivelEquipo(usuarioId, nivel){
   try{
     await api('/api/admin/equipo', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({usuario_id: usuarioId, nivel}) });
     toast(nivel==='ninguno' ? 'Acceso retirado' : nivel==='ver' ? 'Acceso de solo lectura ✓' : 'Acceso con creación de clientes ✓');
+  }catch(e){ toast(e.message); }
+}
+
+async function cambiarClavesEquipo(usuarioId, activo){
+  try{
+    await api('/api/admin/equipo', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({usuario_id: usuarioId, ver_claves: activo}) });
+    toast(activo ? 'Ahora puede ver las claves de los clientes 🔑' : 'Ya no puede ver claves');
+    render();
   }catch(e){ toast(e.message); }
 }
 
