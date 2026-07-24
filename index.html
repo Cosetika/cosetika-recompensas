@@ -225,8 +225,8 @@ async function renderAdmin(){
         <div class="card" style="background:var(--bl);border-color:rgba(160,104,74,0.25)">
           <div style="font-size:12px;color:var(--brown-dark);line-height:1.5">
             <i class="ti ti-refresh" style="color:var(--brown)"></i>
-            La app revisa Contifico cada 30 minutos y acredita el <b>10% del subtotal sin IVA</b>
-            de cada factura al RUC de cada estética. Sin registro manual.
+            La app revisa Contifico cada 30 minutos y acredita el <b>10% del total de la factura
+            (con IVA)</b> al RUC de cada estética. Sin registro manual.
           </div>
         </div>`;
     }
@@ -262,7 +262,7 @@ async function renderAdmin(){
               <div class="mov-ico" style="background:var(--verde-bg);color:var(--verde)"><i class="ti ti-file-invoice"></i></div>
               <div style="flex:1">
                 <div style="font-size:12px;font-weight:600">${f.documento||'—'}</div>
-                <div style="font-size:11px;color:var(--muted)">${fmtFecha(f.fecha)} · subtotal ${fmt(f.subtotal)}</div>
+                <div style="font-size:11px;color:var(--muted)">${fmtFecha(f.fecha)} · ${fmt(f.subtotal)}</div>
               </div>
               <div style="font-size:13px;font-weight:700;color:var(--verde-txt)">+${fmt(f.recompensa)}</div>
             </div>`).join('') : '<p style="font-size:12px;color:var(--muted)">Sin facturas todavía — se acreditan automáticamente cuando la estética compre.</p>'}
@@ -329,7 +329,7 @@ async function renderAdmin(){
         <div class="card" style="background:var(--bl);border-color:rgba(160,104,74,0.25)">
           <div style="font-size:12px;color:var(--brown-dark);line-height:1.5">
             Con la cédula/RUC la app cruza automáticamente las facturas de Contifico y genera el
-            saldo (10% del subtotal sin IVA). Si eliges una fecha pasada, trae las compras
+            saldo (10% del total con IVA). Si eliges una fecha pasada, trae las compras
             retroactivas desde ese día.
           </div>
         </div>`;
@@ -483,8 +483,8 @@ async function renderCliente(){
           <div class="card-title"><i class="ti ti-sparkles"></i> ¿Cómo funciona?</div>
           <div style="font-size:12px;color:var(--muted);line-height:1.6">
             Cada compra tuya a COSÉTIKA te devuelve el <b style="color:var(--brown)">10%</b> del
-            subtotal en saldo para canjear por productos. Se acredita automáticamente con cada
-            factura — no tienes que hacer nada. Al canjear, los productos llegan
+            valor de tu factura en saldo para canjear por productos. Se acredita automáticamente
+            con cada compra — no tienes que hacer nada. Al canjear, los productos llegan
             <b>gratis en tu próximo pedido</b>.
           </div>
         </div>
@@ -496,7 +496,7 @@ async function renderCliente(){
               <div class="mov-ico" style="background:var(--verde-bg);color:var(--verde)"><i class="ti ti-arrow-down-left"></i></div>
               <div style="flex:1">
                 <div style="font-size:12px;font-weight:600">Compra ${f.documento||''}</div>
-                <div style="font-size:11px;color:var(--muted)">${fmtFecha(f.fecha)} · subtotal ${fmt(f.subtotal)}</div>
+                <div style="font-size:11px;color:var(--muted)">${fmtFecha(f.fecha)} · ${fmt(f.subtotal)}</div>
               </div>
               <div style="font-size:12px;font-weight:700;color:var(--verde-txt)">+${fmt(f.recompensa)}</div>
             </div>`).join('')}

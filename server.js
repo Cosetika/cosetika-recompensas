@@ -12,7 +12,8 @@ const { Pool } = require('pg');
 
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.CONTIFICO_API_KEY || '';
-const REGLA_PCT = 0.10; // 10% exacto sobre subtotal sin IVA
+const REGLA_PCT = 0.10; // 10% exacto sobre el TOTAL CON IVA de la factura
+// (los precios del catálogo de canje son PVP con IVA, así que la base también lo es)
 
 // WooCommerce (cosetika.com): fuente de PRECIOS (PVP web) y FOTOS de productos.
 // Claves de solo lectura generadas en WooCommerce → Ajustes → Avanzado → REST API.
@@ -283,15 +284,17 @@ async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null) {
         if (!cli) continue;
         const fechaSQL = fechaDocASQL(d.fecha_emision);
         if (!fechaSQL || fechaSQL < cli.desde) continue; // solo compras desde la fecha de alta
-        const subtotal = Math.round(parseFloat(d.subtotal || d.subtotal_15 || d.subtotal_12 || (d.total/1.15) || 0)*100)/100;
-        if (subtotal <= 0) continue; // ej. la propia factura de un canje al 100% dcto.
-        const recompensa = Math.round(subtotal * REGLA_PCT * 100)/100;
+        // Base de la recompensa: TOTAL CON IVA de la factura (columna "subtotal" de la
+        // tabla guarda este monto base — el nombre quedó del diseño inicial sin IVA).
+        const montoBase = Math.round(parseFloat(d.total || 0)*100)/100;
+        if (montoBase <= 0) continue; // ej. la propia factura de un canje al 100% dcto.
+        const recompensa = Math.round(montoBase * REGLA_PCT * 100)/100;
         revisados++;
         const r = await pool.query(
           `INSERT INTO recompensas_compras(cliente_id, documento_id, documento, fecha, subtotal, recompensa)
            VALUES($1,$2,$3,$4,$5,$6)
            ON CONFLICT (cliente_id, documento_id) DO NOTHING`,
-          [cli.id, docKey, d.documento || '', fechaSQL, subtotal, recompensa]
+          [cli.id, docKey, d.documento || '', fechaSQL, montoBase, recompensa]
         );
         if (r.rowCount > 0) nuevos++;
       }
@@ -531,6 +534,22 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── ADMIN: recalcular TODO desde cero (usar tras un cambio de regla, ej.
+  // el paso de "10% sin IVA" a "10% con IVA"). Borra las compras acreditadas y
+  // las vuelve a traer de Contifico desde la fecha "desde" de cada cliente.
+  // Los canjes NO se tocan.
+  if (urlPath === '/api/admin/recalcular' && req.method === 'GET') {
+    const rCli = await pool.query('SELECT id, nombre FROM recompensas_clientes WHERE activo=true ORDER BY id');
+    const resultados = [];
+    for (const c of rCli.rows) {
+      await pool.query('DELETE FROM recompensas_compras WHERE cliente_id=$1', [c.id]);
+      const r = await sincronizarCompras(0, c.id);
+      resultados.push({ cliente: c.nombre, ...r });
+    }
+    json(res, 200, { ok:true, clientes: resultados.length, resultados });
+    return;
+  }
+
   // ── CATÁLOGO: cliente ve solo VERDE con precio; admin (?todos=1) ve todo ──
   if (urlPath === '/api/catalogo' && req.method === 'GET') {
     const todos = urlObj.searchParams.get('todos') === '1';
@@ -627,7 +646,7 @@ const server = http.createServer(async (req, res) => {
       web: { productos: Object.keys(wooPorSku).length, synced_at: wooSyncedAt, error: wooUltimoError },
       inventario_corte: INVENTARIO_CACHE?.fecha_corte || null,
       ventas_data: !!VENTAS_CACHE,
-      regla: '10% del subtotal sin IVA · precios PVP de cosetika.com'
+      regla: '10% del total con IVA · precios PVP de cosetika.com'
     });
     return;
   }

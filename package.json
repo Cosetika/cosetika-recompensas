@@ -1,7 +1,7 @@
 {
   "name": "cosetika-recompensas",
   "version": "1.0.0",
-  "description": "Plan de Recompensas COSÉTIKA — 10% del subtotal sin IVA en saldo canjeable por productos",
+  "description": "Plan de Recompensas COSÉTIKA — 10% del total de cada compra en saldo canjeable por productos",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
