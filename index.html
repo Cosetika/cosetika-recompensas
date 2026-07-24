@@ -205,6 +205,11 @@ async function renderAdmin(){
       const saldoTotal = CLIENTES.reduce((a,c)=>a+c.saldo,0);
       const comprasTotal = CLIENTES.reduce((a,c)=>a+c.compras,0);
       html = `
+        ${CANJES_PEND.length?`
+        <div class="card" style="border:1.5px solid var(--brown);background:#fdf8f4">
+          <div class="card-title" style="color:var(--brown)"><i class="ti ti-bell-ringing"></i> ${CANJES_PEND.length} solicitud${CANJES_PEND.length>1?'es':''} de canje pendiente${CANJES_PEND.length>1?'s':''}</div>
+          ${CANJES_PEND.map(x=>renderCanjePendiente(x)).join('')}
+        </div>`:''}
         <div class="kpi-row">
           <div class="kpi"><div class="kpi-label">Clientes</div><div class="kpi-val">${CLIENTES.length}</div></div>
           <div class="kpi"><div class="kpi-label">Compras acum.</div><div class="kpi-val" style="font-size:13px">${fmt(comprasTotal)}</div></div>
@@ -285,20 +290,7 @@ async function renderAdmin(){
       html = `
         <div class="card">
           <div class="card-title"><i class="ti ti-gift"></i> Solicitudes pendientes</div>
-          ${CANJES_PEND.length ? CANJES_PEND.map(x=>`
-            <div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-                <div class="avatar" style="background:var(--brown);width:30px;height:30px;font-size:10px">${iniciales(x.cliente_nombre)}</div>
-                <div style="flex:1;font-size:13px;font-weight:600">${x.cliente_nombre}</div>
-                <span class="pill pill-amarillo">${fmtFecha(x.fecha)}</span>
-              </div>
-              ${x.items.map(it=>`<div style="font-size:12px;color:var(--muted);padding:2px 0">· ${it.qty}× ${it.nombre} <span style="float:right">${fmt(it.precio*it.qty)}</span></div>`).join('')}
-              <div style="font-size:12px;font-weight:700;text-align:right;margin-top:4px;color:var(--brown)">Total: ${fmt(x.total)}</div>
-              ${esAdmin()?`<div style="display:flex;gap:8px;margin-top:10px">
-                <button class="btn" style="flex:1;padding:8px" onclick="resolverCanje(${x.id},'aprobado')"><i class="ti ti-check"></i> Aprobar</button>
-                <button class="btn-outline" style="flex:1" onclick="resolverCanje(${x.id},'rechazado')">Rechazar</button>
-              </div>`:''}
-            </div>`).join('') : '<p style="font-size:12px;color:var(--muted)">No hay solicitudes pendientes 🎉</p>'}
+          ${CANJES_PEND.length ? CANJES_PEND.map(x=>renderCanjePendiente(x)).join('') : '<p style="font-size:12px;color:var(--muted)">No hay solicitudes pendientes 🎉</p>'}
         </div>
         <div class="card" style="background:var(--bl);border-color:rgba(160,104,74,0.25)">
           <div style="font-size:12px;color:var(--brown-dark);line-height:1.5">
@@ -426,6 +418,23 @@ async function cargarCanjesAprobados(){
 }
 
 function verClienteAdmin(id){ window._adminCliente=id; tabActual='detalle'; render(); }
+
+// Tarjeta de solicitud de canje pendiente (se usa en Inicio y en la pestaña Canjes)
+function renderCanjePendiente(x){
+  return `<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;background:#fff">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div class="avatar" style="background:var(--brown);width:30px;height:30px;font-size:10px">${iniciales(x.cliente_nombre)}</div>
+      <div style="flex:1;font-size:13px;font-weight:600">${x.cliente_nombre}</div>
+      <span class="pill pill-amarillo">${fmtFecha(x.fecha)}</span>
+    </div>
+    ${x.items.map(it=>`<div style="font-size:12px;color:var(--muted);padding:2px 0">· ${it.qty}× ${it.nombre} <span style="float:right">${fmt(it.precio*it.qty)}</span></div>`).join('')}
+    <div style="font-size:12px;font-weight:700;text-align:right;margin-top:4px;color:var(--brown)">Total: ${fmt(x.total)}</div>
+    ${esAdmin()?`<div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn" style="flex:1;padding:8px" onclick="resolverCanje(${x.id},'aprobado')"><i class="ti ti-check"></i> Aprobar</button>
+      <button class="btn-outline" style="flex:1" onclick="resolverCanje(${x.id},'rechazado')">Rechazar</button>
+    </div>`:''}
+  </div>`;
+}
 
 async function cambiarNivelEquipo(usuarioId, nivel){
   try{
