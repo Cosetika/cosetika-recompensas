@@ -14,6 +14,12 @@ const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.CONTIFICO_API_KEY || '';
 const REGLA_PCT = 0.10; // 10% exacto sobre subtotal sin IVA
 
+// WooCommerce (cosetika.com): fuente de PRECIOS (PVP web) y FOTOS de productos.
+// Claves de solo lectura generadas en WooCommerce → Ajustes → Avanzado → REST API.
+const WC_URL = (process.env.WC_URL || 'https://cosetika.com').replace(/\/$/, '');
+const WC_KEY = process.env.WC_CONSUMER_KEY || '';
+const WC_SECRET = process.env.WC_CONSUMER_SECRET || '';
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
@@ -77,6 +83,54 @@ async function sincronizarCatalogo() {
       console.log(`✓ Catálogo: ${Object.keys(nuevos).length} productos (${conPrecio} con precio)`);
     }
   } catch(e) { console.error('Error catálogo:', e.message); }
+}
+
+// ─── WOOCOMMERCE: precios PVP y fotos por SKU ────────────────────────────────
+let wooPorSku = {};      // SKU → { precio, imagen, nombre }
+let wooSyncedAt = null;
+let wooUltimoError = null;
+
+async function sincronizarWoo() {
+  if (!WC_KEY || !WC_SECRET) {
+    wooUltimoError = 'Faltan WC_CONSUMER_KEY / WC_CONSUMER_SECRET en las variables';
+    console.log('⚠️ WooCommerce: ' + wooUltimoError);
+    return;
+  }
+  try {
+    const nuevos = {};
+    let pagina = 1, totalProds = 0;
+    while (pagina <= 30) {
+      const url = `${WC_URL}/wp-json/wc/v3/products?status=publish&per_page=100&page=${pagina}` +
+        `&consumer_key=${encodeURIComponent(WC_KEY)}&consumer_secret=${encodeURIComponent(WC_SECRET)}`;
+      const resp = await fetch(url, { headers: { 'Accept': 'application/json', 'User-Agent': 'CosetikaRecompensas/1.0' } });
+      if (!resp.ok) { wooUltimoError = `HTTP ${resp.status} al consultar productos`; break; }
+      const prods = await resp.json();
+      if (!Array.isArray(prods) || prods.length === 0) break;
+      prods.forEach(p => {
+        const sku = (p.sku || '').trim();
+        if (!sku) return;
+        nuevos[sku] = {
+          precio: Math.round((parseFloat(p.price) || 0)*100)/100,
+          imagen: (p.images && p.images[0] && p.images[0].src) || null,
+          nombre: p.name || ''
+        };
+      });
+      totalProds += prods.length;
+      if (prods.length < 100) break;
+      pagina++;
+    }
+    if (Object.keys(nuevos).length > 0) {
+      wooPorSku = nuevos;
+      wooSyncedAt = new Date().toISOString();
+      wooUltimoError = null;
+      console.log(`✓ WooCommerce: ${totalProds} productos, ${Object.keys(nuevos).length} con SKU`);
+    } else if (!wooUltimoError) {
+      wooUltimoError = 'La tienda no devolvió productos con SKU';
+    }
+  } catch(e) {
+    wooUltimoError = e.message;
+    console.error('Error WooCommerce:', e.message);
+  }
 }
 
 // ─── DATA DEL DASHBOARD (misma BD): ventas e inventario para el semáforo ─────
@@ -143,11 +197,16 @@ function construirCatalogoCanje() {
       const stock = inv ? inv.cantidad : 0;
       const rotMensual = rotacion[id] || 0;
       const cobertura = rotMensual > 0 ? stock/rotMensual : (stock > 0 ? 99 : 0);
+      // Precio y foto: primero la web (PVP de cosetika.com, cruzado por SKU);
+      // si el producto no está en la web, cae al precio del catálogo de Contifico.
+      const woo = wooPorSku[(info.codigo||'').trim()] || null;
       return {
         id,
         nombre: info.nombre,
         marca: info.marca,
-        precio: info.precio,
+        precio: (woo && woo.precio > 0) ? woo.precio : info.precio,
+        imagen: woo ? woo.imagen : null,
+        precio_fuente: (woo && woo.precio > 0) ? 'web' : (info.precio > 0 ? 'contifico' : null),
         stock: Math.round(stock),
         semaforo: calcularSemaforo(info.marca, cobertura)
       };
@@ -307,11 +366,13 @@ async function initDB() {
 initDB()
   .then(() => cargarDataDashboard())
   .then(() => sincronizarCatalogo())
+  .then(() => sincronizarWoo())
   .then(() => sincronizarCompras(3))
   .catch(e => console.error('Error init:', e.message));
 setInterval(() => sincronizarCompras(3).catch(e=>console.error(e)), 30 * 60 * 1000);       // compras cada 30 min
 setInterval(() => cargarDataDashboard().catch(e=>console.error(e)), 60 * 60 * 1000);       // semáforo cada hora
 setInterval(() => sincronizarCatalogo().catch(e=>console.error(e)), 24 * 60 * 60 * 1000);  // catálogo diario
+setInterval(() => sincronizarWoo().catch(e=>console.error(e)), 6 * 60 * 60 * 1000);        // precios/fotos web cada 6 h
 
 // ─── HTTP ────────────────────────────────────────────────────────────────────
 const MIME = { '.html':'text/html','.js':'application/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.jpg':'image/jpeg','.ico':'image/x-icon','.svg':'image/svg+xml' };
@@ -510,6 +571,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── ADMIN: forzar sync de precios/fotos de la web ──
+  if (urlPath === '/api/admin/sync-woo' && req.method === 'GET') {
+    await sincronizarWoo();
+    json(res, 200, {
+      ok: !wooUltimoError,
+      productos_web: Object.keys(wooPorSku).length,
+      synced_at: wooSyncedAt,
+      error: wooUltimoError
+    });
+    return;
+  }
+
   // ── DEBUG: campos crudos del producto de Contifico (para ajustar el precio) ──
   if (urlPath === '/api/debug/producto-campos' && req.method === 'GET') {
     json(res, 200, {
@@ -526,9 +599,10 @@ const server = http.createServer(async (req, res) => {
     json(res, 200, {
       ok: true,
       catalogo: { total: Object.keys(catalogoProductos).length, synced_at: catalogoSyncedAt },
+      web: { productos: Object.keys(wooPorSku).length, synced_at: wooSyncedAt, error: wooUltimoError },
       inventario_corte: INVENTARIO_CACHE?.fecha_corte || null,
       ventas_data: !!VENTAS_CACHE,
-      regla: '10% del subtotal sin IVA'
+      regla: '10% del subtotal sin IVA · precios PVP de cosetika.com'
     });
     return;
   }
