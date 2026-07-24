@@ -314,7 +314,7 @@ async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null) {
 // ─── SALDOS ──────────────────────────────────────────────────────────────────
 async function resumenCliente(clienteId) {
   const rCli = await pool.query(
-    `SELECT id, ruc, nombre, contacto, ciudad, usuario, TO_CHAR(desde,'YYYY-MM-DD') AS desde, activo
+    `SELECT id, ruc, nombre, contacto, ciudad, usuario, password, TO_CHAR(desde,'YYYY-MM-DD') AS desde, activo
      FROM recompensas_clientes WHERE id=$1`, [clienteId]);
   if (!rCli.rows.length) return null;
   const rComp = await pool.query(
@@ -576,7 +576,8 @@ const server = http.createServer(async (req, res) => {
   if (mRes && req.method === 'GET') {
     const resumen = await resumenCliente(parseInt(mRes[1]));
     if (!resumen) { json(res, 404, { ok:false, error:'Cliente no encontrado' }); return; }
-    delete resumen.cliente.usuario; // no exponer credenciales
+    delete resumen.cliente.usuario;  // no exponer credenciales al lado cliente
+    delete resumen.cliente.password;
     json(res, 200, resumen);
     return;
   }
