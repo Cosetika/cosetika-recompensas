@@ -170,18 +170,23 @@ function shellLoader(tabs){ shell('<div class="loader"><i class="ti ti-loader"><
 function setTab(t){ tabActual=t; render(); }
 function render(){
   if(!sesion){ renderLogin(); return; }
-  if(sesion.tipo==='admin') renderAdmin();
+  if(sesion.tipo==='admin' || sesion.tipo==='staff') renderAdmin();
   else renderCliente();
 }
 
-// ═══════════════════ ADMIN ═══════════════════
+// ═══════════════════ ADMIN / EQUIPO ═══════════════════
+function esAdmin(){ return sesion && sesion.tipo==='admin'; }
+function puedeCrear(){ return esAdmin() || (sesion && sesion.tipo==='staff' && sesion.nivel==='crear'); }
+
 function tabsAdmin(){
-  return [
+  const t = [
     {id:'inicio', icono:'users', label:'Clientes'},
     {id:'canjes', icono:'gift', label:'Canjes', badge:CANJES_PEND.length||''},
-    {id:'nuevo', icono:'user-plus', label:'Nuevo'},
-    {id:'catalogo', icono:'package', label:'Catálogo'},
   ];
+  if(puedeCrear()) t.push({id:'nuevo', icono:'user-plus', label:'Nuevo'});
+  t.push({id:'catalogo', icono:'package', label:'Catálogo'});
+  if(esAdmin()) t.push({id:'equipo', icono:'shield', label:'Equipo'});
+  return t;
 }
 
 async function renderAdmin(){
@@ -207,7 +212,7 @@ async function renderAdmin(){
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <div class="card-title" style="margin-bottom:0"><i class="ti ti-users"></i> Estéticas en el plan</div>
-            <button class="btn-outline" style="padding:5px 10px;font-size:11px" onclick="forzarSync()"><i class="ti ti-refresh"></i> Sync compras</button>
+            ${puedeCrear()?`<button class="btn-outline" style="padding:5px 10px;font-size:11px" onclick="forzarSync()"><i class="ti ti-refresh"></i> Sync compras</button>`:''}
           </div>
           ${CLIENTES.length ? CLIENTES.map(c=>`
             <div class="mov" style="cursor:pointer;${!c.activo?'opacity:0.45':''}" onclick="verClienteAdmin(${c.id})">
@@ -248,14 +253,14 @@ async function renderAdmin(){
           <div style="font-size:12px;color:var(--muted);line-height:1.8">
             RUC/Cédula: <b style="color:var(--text)">${d.cliente.ruc}</b><br>
             Contacto: <b style="color:var(--text)">${d.cliente.contacto||'—'}</b> · Ciudad: <b style="color:var(--text)">${d.cliente.ciudad||'—'}</b><br>
-            Usuario de acceso: <b style="color:var(--text)">${d.cliente.usuario}</b> · Clave: <b style="color:var(--brown)" id="clave-cli" data-clave="${(d.cliente.password||'').replace(/"/g,'&quot;')}">••••</b>
-            <a href="#" onclick="event.preventDefault();const e=document.getElementById('clave-cli');e.textContent=e.textContent==='••••'?e.dataset.clave:'••••'" style="font-size:11px;color:var(--brown)">(ver)</a><br>
+            Usuario de acceso: <b style="color:var(--text)">${d.cliente.usuario}</b>${esAdmin()?` · Clave: <b style="color:var(--brown)" id="clave-cli" data-clave="${(d.cliente.password||'').replace(/"/g,'&quot;')}">••••</b>
+            <a href="#" onclick="event.preventDefault();const e=document.getElementById('clave-cli');e.textContent=e.textContent==='••••'?e.dataset.clave:'••••'" style="font-size:11px;color:var(--brown)">(ver)</a>`:''}<br>
             Compras cuentan desde: <b style="color:var(--text)">${fmtFecha(d.cliente.desde)}</b>
           </div>
-          <div style="display:flex;gap:8px;margin-top:10px">
+          ${esAdmin()?`<div style="display:flex;gap:8px;margin-top:10px">
             <button class="btn-outline" style="flex:1" onclick="cambiarPasswordCliente(${d.cliente.id})"><i class="ti ti-key"></i> Cambiar clave</button>
             <button class="btn-outline" style="flex:1" onclick="toggleActivoCliente(${d.cliente.id}, ${d.cliente.activo})">${d.cliente.activo?'<i class="ti ti-user-off"></i> Desactivar':'<i class="ti ti-user-check"></i> Activar'}</button>
-          </div>
+          </div>`:''}
         </div>
         <div class="card">
           <div class="card-title"><i class="ti ti-receipt"></i> Facturas acreditadas (Contifico)</div>
@@ -288,10 +293,10 @@ async function renderAdmin(){
               </div>
               ${x.items.map(it=>`<div style="font-size:12px;color:var(--muted);padding:2px 0">· ${it.qty}× ${it.nombre} <span style="float:right">${fmt(it.precio*it.qty)}</span></div>`).join('')}
               <div style="font-size:12px;font-weight:700;text-align:right;margin-top:4px;color:var(--brown)">Total: ${fmt(x.total)}</div>
-              <div style="display:flex;gap:8px;margin-top:10px">
+              ${esAdmin()?`<div style="display:flex;gap:8px;margin-top:10px">
                 <button class="btn" style="flex:1;padding:8px" onclick="resolverCanje(${x.id},'aprobado')"><i class="ti ti-check"></i> Aprobar</button>
                 <button class="btn-outline" style="flex:1" onclick="resolverCanje(${x.id},'rechazado')">Rechazar</button>
-              </div>
+              </div>`:''}
             </div>`).join('') : '<p style="font-size:12px;color:var(--muted)">No hay solicitudes pendientes 🎉</p>'}
         </div>
         <div class="card" style="background:var(--bl);border-color:rgba(160,104,74,0.25)">
@@ -334,6 +339,32 @@ async function renderAdmin(){
             saldo (10% del total con IVA). Si eliges una fecha pasada, trae las compras
             retroactivas desde ese día.
           </div>
+        </div>`;
+    }
+
+    if(tabActual==='equipo' && esAdmin()){
+      const equipo = await api('/api/admin/equipo');
+      html = `
+        <div class="card">
+          <div class="card-title"><i class="ti ti-shield"></i> Acceso del equipo a Recompensas</div>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:10px">
+            Entran con su mismo usuario y contraseña del dashboard.
+            <b>Solo ver</b>: consulta clientes, saldos y canjes. <b>Ver y crear</b>: además crea clientes del plan.
+            Aprobar canjes y ver claves sigue siendo solo tuyo.
+          </p>
+          ${equipo.map(u=>`
+            <div class="mov">
+              <div class="avatar" style="background:var(--brown);width:34px;height:34px;font-size:11px">${iniciales(u.nombre)}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.nombre}</div>
+                <div style="font-size:10px;color:var(--muted)">@${u.usuario} · ${u.rol}</div>
+              </div>
+              <select onchange="cambiarNivelEquipo(${u.id}, this.value)" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:12px;outline:none;background:#fff;cursor:pointer">
+                <option value="ninguno" ${u.nivel==='ninguno'?'selected':''}>Sin acceso</option>
+                <option value="ver" ${u.nivel==='ver'?'selected':''}>Solo ver</option>
+                <option value="crear" ${u.nivel==='crear'?'selected':''}>Ver y crear</option>
+              </select>
+            </div>`).join('')}
         </div>`;
     }
 
@@ -384,12 +415,19 @@ async function cargarCanjesAprobados(){
           <div style="font-size:12px;font-weight:600">${x.cliente_nombre}</div>
           <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.items.map(i=>i.qty+'× '+i.nombre).join(', ')}</div>
         </div>
-        <button class="btn-outline" style="padding:5px 10px;font-size:11px" onclick="resolverCanje(${x.id},'entregado')"><i class="ti ti-truck"></i> Entregado</button>
+        ${esAdmin()?`<button class="btn-outline" style="padding:5px 10px;font-size:11px" onclick="resolverCanje(${x.id},'entregado')"><i class="ti ti-truck"></i> Entregado</button>`:`<span class="pill pill-verde">Aprobado</span>`}
       </div>`).join('') : '<p style="font-size:12px;color:var(--muted)">Nada pendiente de entrega</p>';
   }catch(e){ /* silencioso */ }
 }
 
 function verClienteAdmin(id){ window._adminCliente=id; tabActual='detalle'; render(); }
+
+async function cambiarNivelEquipo(usuarioId, nivel){
+  try{
+    await api('/api/admin/equipo', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({usuario_id: usuarioId, nivel}) });
+    toast(nivel==='ninguno' ? 'Acceso retirado' : nivel==='ver' ? 'Acceso de solo lectura ✓' : 'Acceso con creación de clientes ✓');
+  }catch(e){ toast(e.message); }
+}
 
 async function crearCliente(){
   const btn = document.getElementById('n-btn');

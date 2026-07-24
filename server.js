@@ -380,6 +380,12 @@ async function initDB() {
         resuelto_at TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_recomp_canjes_cliente ON recompensas_canjes(cliente_id);
+      CREATE TABLE IF NOT EXISTS recompensas_permisos (
+        id SERIAL PRIMARY KEY,
+        usuario_id INTEGER UNIQUE NOT NULL,
+        nivel VARCHAR(10) NOT NULL DEFAULT 'ver', -- 'ver' | 'crear'
+        actualizado_at TIMESTAMP DEFAULT NOW()
+      );
     `);
     console.log('✓ Tablas recompensas_* listas');
   } catch(e) { console.error('Error initDB:', e.message); }
@@ -422,22 +428,56 @@ const server = http.createServer(async (req, res) => {
 
   try {
 
-  // ── LOGIN: admin (tabla usuarios del dashboard, rol admin) o cliente ──
+  // ── LOGIN: equipo COSÉTIKA (tabla usuarios del dashboard) o cliente del plan ──
+  // admin → acceso total · asesora/jefa con permiso → 'ver' o 'crear' (tab Equipo)
   if (urlPath === '/api/login' && req.method === 'POST') {
     const { usuario, password } = await bodyJSON(req);
-    // 1) admin del dashboard
+    // 1) equipo del dashboard (misma clave que usan en el panel de ventas)
     try {
-      const rA = await pool.query(
-        `SELECT id, nombre FROM usuarios WHERE usuario=$1 AND password=$2 AND rol='admin' AND activo=true`,
+      const rU = await pool.query(
+        `SELECT id, nombre, rol FROM usuarios WHERE usuario=$1 AND password=$2 AND activo=true`,
         [usuario, password]);
-      if (rA.rows.length) { json(res, 200, { ok:true, tipo:'admin', nombre: rA.rows[0].nombre }); return; }
-    } catch(e) { /* tabla usuarios podría no existir en otra BD — seguir al cliente */ }
+      if (rU.rows.length) {
+        const u = rU.rows[0];
+        if (u.rol === 'admin') { json(res, 200, { ok:true, tipo:'admin', nombre: u.nombre }); return; }
+        const rP = await pool.query('SELECT nivel FROM recompensas_permisos WHERE usuario_id=$1', [u.id]);
+        if (rP.rows.length) { json(res, 200, { ok:true, tipo:'staff', nivel: rP.rows[0].nivel, nombre: u.nombre }); return; }
+        json(res, 401, { ok:false, error:'Tu usuario aún no tiene acceso al Plan de Recompensas — pídeselo a Fernando' });
+        return;
+      }
+    } catch(e) { /* tabla usuarios podría no existir — seguir al cliente */ }
     // 2) cliente del plan
     const rC = await pool.query(
       `SELECT id, nombre, contacto FROM recompensas_clientes WHERE usuario=$1 AND password=$2 AND activo=true`,
       [usuario, password]);
     if (rC.rows.length) { json(res, 200, { ok:true, tipo:'cliente', cliente_id: rC.rows[0].id, nombre: rC.rows[0].nombre, contacto: rC.rows[0].contacto }); return; }
     json(res, 401, { ok:false, error:'Usuario o contraseña incorrectos' });
+    return;
+  }
+
+  // ── ADMIN: equipo con acceso a Recompensas ──
+  if (urlPath === '/api/admin/equipo' && req.method === 'GET') {
+    const r = await pool.query(`
+      SELECT u.id, u.nombre, u.usuario, u.rol, p.nivel
+      FROM usuarios u
+      LEFT JOIN recompensas_permisos p ON p.usuario_id = u.id
+      WHERE u.activo=true AND u.rol != 'admin'
+      ORDER BY u.nombre`);
+    json(res, 200, r.rows.map(x => ({ ...x, nivel: x.nivel || 'ninguno' })));
+    return;
+  }
+  if (urlPath === '/api/admin/equipo' && req.method === 'POST') {
+    const { usuario_id, nivel } = await bodyJSON(req);
+    if (!usuario_id || !['ninguno','ver','crear'].includes(nivel)) { json(res, 400, { ok:false, error:'Datos inválidos' }); return; }
+    if (nivel === 'ninguno') {
+      await pool.query('DELETE FROM recompensas_permisos WHERE usuario_id=$1', [usuario_id]);
+    } else {
+      await pool.query(
+        `INSERT INTO recompensas_permisos(usuario_id, nivel) VALUES($1,$2)
+         ON CONFLICT(usuario_id) DO UPDATE SET nivel=$2, actualizado_at=NOW()`,
+        [usuario_id, nivel]);
+    }
+    json(res, 200, { ok:true });
     return;
   }
 
