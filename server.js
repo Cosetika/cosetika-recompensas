@@ -105,9 +105,18 @@ async function sincronizarWoo() {
       const resp = await fetch(url, { headers: {
         'Accept': 'application/json',
         'Accept-Language': 'es-EC,es;q=0.9',
+        'Authorization': 'Basic ' + Buffer.from(WC_KEY + ':' + WC_SECRET).toString('base64'),
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
       } });
-      if (!resp.ok) { wooUltimoError = `HTTP ${resp.status} al consultar productos`; break; }
+      if (!resp.ok) {
+        // Diagnóstico: identificar QUIÉN bloquea (Cloudflare deja cabecera cf-ray y
+        // página propia; un plugin de WordPress devuelve JSON/HTML de WordPress)
+        let cuerpo = '';
+        try { cuerpo = (await resp.text()).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0, 260); } catch(e) {}
+        const esCloudflare = !!resp.headers.get('cf-mitigated') || /cloudflare/i.test(cuerpo) ? ' [CLOUDFLARE]' : '';
+        wooUltimoError = `HTTP ${resp.status}${esCloudflare} — ${cuerpo || 'sin detalle'}`;
+        break;
+      }
       const prods = await resp.json();
       if (!Array.isArray(prods) || prods.length === 0) break;
       prods.forEach(p => {
