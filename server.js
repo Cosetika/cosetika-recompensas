@@ -477,7 +477,7 @@ initDB()
   .then(() => sincronizarWoo())
   .then(() => sincronizarCompras(3))
   .catch(e => console.error('Error init:', e.message));
-setInterval(() => sincronizarCompras(1).catch(e=>console.error(e)), 5 * 60 * 1000);        // facturas del día cada 5 min
+setInterval(() => sincronizarCompras(1).catch(e=>console.error(e)), 60 * 1000);            // facturas del día cada 60 segundos
 setInterval(() => sincronizarCompras(7).catch(e=>console.error(e)), 6 * 60 * 60 * 1000);   // repaso de la semana cada 6 h
 setInterval(() => cargarSemaforos().catch(e=>console.error(e)), 15 * 60 * 1000);           // semáforo Proyección cada 15 min
 setInterval(() => sincronizarCatalogo().catch(e=>console.error(e)), 24 * 60 * 60 * 1000);  // catálogo diario
