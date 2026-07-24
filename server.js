@@ -220,7 +220,7 @@ function construirCatalogoCanje() {
         precio: (woo && woo.precio > 0) ? woo.precio : info.precio,
         imagen: woo ? woo.imagen : null,
         precio_fuente: (woo && woo.precio > 0) ? 'web' : (info.precio > 0 ? 'contifico' : null),
-        stock: Math.round(stock),
+        en_web: !!woo,
         semaforo: calcularSemaforo(info.marca, cobertura)
       };
     })
@@ -535,9 +535,13 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/api/catalogo' && req.method === 'GET') {
     const todos = urlObj.searchParams.get('todos') === '1';
     const { fecha_corte, productos } = construirCatalogoCanje();
+    // En ambas vistas solo existen los productos que están en la página web:
+    // admin ve todos los de la web (con su estado Visible/Oculto según inventario),
+    // el cliente únicamente los visibles. Lo que está solo en Contifico no aparece.
+    const soloWeb = productos.filter(p => p.en_web);
     const lista = todos
-      ? productos.map(p => ({ ...p, visible: esVisibleCliente(p) }))
-      : productos.filter(esVisibleCliente);
+      ? soloWeb.map(p => ({ ...p, visible: esVisibleCliente(p) }))
+      : soloWeb.filter(esVisibleCliente);
     json(res, 200, {
       ok: true,
       fecha_corte,

@@ -339,15 +339,15 @@ async function renderAdmin(){
       const data = await api('/api/catalogo?todos=1');
       CATALOGO = data.productos;
       const visibles = CATALOGO.filter(p=>p.visible).length;
-      const verdesSinWeb = CATALOGO.filter(p=>p.semaforo==='verde' && !p.visible).length;
+      const ocultos = CATALOGO.length - visibles;
       const q = filtroCat.toLowerCase();
       const lista = CATALOGO.filter(p=>!q || p.nombre.toLowerCase().includes(q) || p.marca.toLowerCase().includes(q));
       html = `
         <div class="card">
           <div class="card-title"><i class="ti ti-package"></i> Catálogo de canje (vista admin)</div>
           <p style="font-size:11px;color:var(--muted);margin-bottom:8px">
-            Corte de inventario: <b>${data.fecha_corte?fmtFecha(data.fecha_corte):'sin subir'}</b> ·
-            <b style="color:var(--verde-txt)">${visibles} visibles para clientes</b> (en verde + precio y foto de la web)${verdesSinWeb?` · <span style="color:var(--rojo)">${verdesSinWeb} en verde pero SIN datos de la web (ocultos)</span>`:''}
+            Productos de cosetika.com · Corte de inventario: <b>${data.fecha_corte?fmtFecha(data.fecha_corte):'sin subir'}</b> ·
+            <b style="color:var(--verde-txt)">${visibles} visibles para clientes</b>${ocultos?` · ${ocultos} ocultos por inventario bajo`:''}
           </p>
           <div class="buscador"><i class="ti ti-search"></i><input class="input" placeholder="Buscar producto o marca..." value="${filtroCat}" oninput="filtroCat=this.value;render()"/></div>
           ${lista.slice(0,150).map(p=>`
@@ -355,7 +355,7 @@ async function renderAdmin(){
               ${prodImg(p)}
               <div style="flex:1;min-width:0">
                 <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.nombre}">${p.nombre}</div>
-                <div style="font-size:10px;color:var(--muted)">${p.marca} · ${p.precio>0?fmt(p.precio)+(p.precio_fuente==='web'?' <span style="color:var(--verde-txt)">(web)</span>':''):'<span style="color:var(--rojo)">sin precio</span>'} · stock ${p.stock}</div>
+                <div style="font-size:10px;color:var(--muted)">${p.marca||''} ${p.marca?'·':''} ${p.precio>0?fmt(p.precio):'<span style="color:var(--rojo)">sin precio en la web</span>'}</div>
               </div>
               <span class="pill ${p.visible?'pill-verde':'pill-rojo'}" title="Semáforo: ${p.semaforo}">${p.visible?'Visible':'Oculto'}</span>
             </div>`).join('')}
