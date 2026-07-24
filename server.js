@@ -215,6 +215,12 @@ function construirCatalogoCanje() {
   return { fecha_corte: INVENTARIO_CACHE.fecha_corte, productos: lista };
 }
 
+// Regla de visibilidad para clientes: inventario VERDE + precio y foto de la WEB.
+// (Pedido por Fernando: solo productos que están en cosetika.com, nada de Contifico solo.)
+function esVisibleCliente(p) {
+  return p.semaforo === 'verde' && p.precio > 0 && p.precio_fuente === 'web' && !!p.imagen;
+}
+
 // ─── SYNC DE COMPRAS: facturas de Contifico → recompensas_compras ────────────
 let syncEnProceso = false;
 
@@ -516,7 +522,9 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/api/catalogo' && req.method === 'GET') {
     const todos = urlObj.searchParams.get('todos') === '1';
     const { fecha_corte, productos } = construirCatalogoCanje();
-    const lista = todos ? productos : productos.filter(p => p.semaforo === 'verde' && p.precio > 0);
+    const lista = todos
+      ? productos.map(p => ({ ...p, visible: esVisibleCliente(p) }))
+      : productos.filter(esVisibleCliente);
     json(res, 200, {
       ok: true,
       fecha_corte,
@@ -545,7 +553,7 @@ const server = http.createServer(async (req, res) => {
     if (!Array.isArray(items) || !items.length) { json(res, 400, { ok:false, error:'El canje está vacío' }); return; }
     const { productos } = construirCatalogoCanje();
     const disponibles = {};
-    productos.filter(p => p.semaforo==='verde' && p.precio>0).forEach(p => { disponibles[p.id] = p; });
+    productos.filter(esVisibleCliente).forEach(p => { disponibles[p.id] = p; });
     const itemsValidados = [];
     let total = 0;
     for (const it of items) {

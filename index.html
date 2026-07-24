@@ -338,8 +338,8 @@ async function renderAdmin(){
     if(tabActual==='catalogo'){
       const data = await api('/api/catalogo?todos=1');
       CATALOGO = data.productos;
-      const verdes = CATALOGO.filter(p=>p.semaforo==='verde').length;
-      const sinPrecio = CATALOGO.filter(p=>p.semaforo==='verde' && !(p.precio>0)).length;
+      const visibles = CATALOGO.filter(p=>p.visible).length;
+      const verdesSinWeb = CATALOGO.filter(p=>p.semaforo==='verde' && !p.visible).length;
       const q = filtroCat.toLowerCase();
       const lista = CATALOGO.filter(p=>!q || p.nombre.toLowerCase().includes(q) || p.marca.toLowerCase().includes(q));
       html = `
@@ -347,7 +347,7 @@ async function renderAdmin(){
           <div class="card-title"><i class="ti ti-package"></i> Catálogo de canje (vista admin)</div>
           <p style="font-size:11px;color:var(--muted);margin-bottom:8px">
             Corte de inventario: <b>${data.fecha_corte?fmtFecha(data.fecha_corte):'sin subir'}</b> ·
-            ${verdes} en verde (visibles para clientes)${sinPrecio?` · <span style="color:var(--rojo)">${sinPrecio} en verde SIN precio (ocultos — revisar PVP en Contifico)</span>`:''}
+            <b style="color:var(--verde-txt)">${visibles} visibles para clientes</b> (en verde + precio y foto de la web)${verdesSinWeb?` · <span style="color:var(--rojo)">${verdesSinWeb} en verde pero SIN datos de la web (ocultos)</span>`:''}
           </p>
           <div class="buscador"><i class="ti ti-search"></i><input class="input" placeholder="Buscar producto o marca..." value="${filtroCat}" oninput="filtroCat=this.value;render()"/></div>
           ${lista.slice(0,150).map(p=>`
@@ -357,7 +357,7 @@ async function renderAdmin(){
                 <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.nombre}">${p.nombre}</div>
                 <div style="font-size:10px;color:var(--muted)">${p.marca} · ${p.precio>0?fmt(p.precio)+(p.precio_fuente==='web'?' <span style="color:var(--verde-txt)">(web)</span>':''):'<span style="color:var(--rojo)">sin precio</span>'} · stock ${p.stock}</div>
               </div>
-              <span class="pill pill-${p.semaforo}">${p.semaforo==='verde'?'Visible':'Oculto'}</span>
+              <span class="pill ${p.visible?'pill-verde':'pill-rojo'}" title="Semáforo: ${p.semaforo}">${p.visible?'Visible':'Oculto'}</span>
             </div>`).join('')}
           ${lista.length>150?`<p style="font-size:11px;color:var(--muted);margin-top:8px">Mostrando 150 de ${lista.length} — usa el buscador</p>`:''}
         </div>`;
