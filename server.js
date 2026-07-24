@@ -228,8 +228,16 @@ async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null) {
     );
     const clientes = rCli.rows;
     if (!clientes.length) { syncEnProceso = false; return { ok:true, nuevos:0, msg:'Sin clientes activos' }; }
+    // Cédula (10 dígitos) y RUC de persona natural (13 = cédula + '001') son la
+    // MISMA persona: se indexa por ambas formas para que la factura cruce siempre,
+    // sin importar con cuál se registró al cliente o cuál usó Contifico.
     const porRuc = {};
-    clientes.forEach(c => { porRuc[c.ruc.trim()] = c; });
+    clientes.forEach(c => {
+      const id = c.ruc.trim();
+      porRuc[id] = c;
+      if (/^\d{10}$/.test(id)) porRuc[id + '001'] = c;
+      if (/^\d{10}001$/.test(id)) porRuc[id.slice(0, 10)] = c;
+    });
 
     // Rango de fechas: últimos N días; si es backfill de un cliente, desde su fecha "desde"
     const hoy = nowEC();
@@ -516,7 +524,7 @@ const server = http.createServer(async (req, res) => {
   const mCli = urlPath.match(/^\/api\/admin\/clientes\/(\d+)$/);
   if (mCli && req.method === 'PUT') {
     const body = await bodyJSON(req);
-    const permitidas = ['nombre','contacto','ciudad','password','activo'];
+    const permitidas = ['nombre','contacto','ciudad','password','activo','ruc','desde'];
     const cols = Object.keys(body).filter(k => permitidas.includes(k));
     if (cols.length) {
       const sets = cols.map((k,i)=>`${k}=$${i+1}`).join(',');
