@@ -147,70 +147,47 @@ async function sincronizarWoo() {
   }
 }
 
-// ─── DATA DEL DASHBOARD (misma BD): ventas e inventario para el semáforo ─────
-let VENTAS_CACHE = null;      // ventas_data (JSON grande del dashboard)
-let INVENTARIO_CACHE = null;  // inventario_data { fecha_corte, productos:{id:{cantidad,...}} }
+// ─── SEMÁFORO: directo del panel PROYECCIÓN del dashboard ────────────────────
+// En vez de recalcular, se consulta /api/inventario del dashboard — la MISMA
+// fuente que pinta la Proyección (bodegas POS + Casa unificadas, sincronizadas
+// a diario desde Contifico). Así los colores siempre coinciden, incluso si
+// Fernando cambia las reglas en el dashboard.
+const DASHBOARD_URL = (process.env.DASHBOARD_URL || 'https://cosetika-dashboard-production.up.railway.app').replace(/\/$/, '');
+let SEMAFOROS = { porId: {}, fecha_corte: null, synced_at: null, error: null };
 
-async function cargarDataDashboard() {
+async function cargarSemaforos() {
   try {
-    const rV = await pool.query("SELECT datos FROM ventas_data ORDER BY actualizado_at DESC LIMIT 1");
-    if (rV.rows.length) VENTAS_CACHE = JSON.parse(rV.rows[0].datos);
-    const rI = await pool.query("SELECT datos FROM inventario_data ORDER BY actualizado_at DESC LIMIT 1");
-    if (rI.rows.length) INVENTARIO_CACHE = JSON.parse(rI.rows[0].datos);
-    console.log(`✓ Data dashboard: ventas ${VENTAS_CACHE?'OK':'—'} · inventario ${INVENTARIO_CACHE?('corte '+INVENTARIO_CACHE.fecha_corte):'—'}`);
-  } catch(e) { console.error('Error cargando data del dashboard:', e.message); }
+    const marcas = ['BIOSKIN','ERAYBA','ZIAJA','ZIAJA PRO'];
+    const porId = {};
+    let fechaCorte = null, ok = false, ultimoError = null;
+    for (const m of marcas) {
+      try {
+        const resp = await fetch(`${DASHBOARD_URL}/api/inventario?marca=${encodeURIComponent(m)}`, { headers: { 'Accept': 'application/json' } });
+        if (!resp.ok) { ultimoError = `HTTP ${resp.status} consultando Proyección (${m})`; continue; }
+        const data = await resp.json();
+        (data.productos || []).forEach(p => { if (p.id) porId[p.id] = p.semaforo; });
+        if (data.fecha_corte) fechaCorte = data.fecha_corte;
+        ok = true;
+      } catch(e) { ultimoError = e.message; }
+    }
+    if (ok) {
+      SEMAFOROS = { porId, fecha_corte: fechaCorte, synced_at: new Date().toISOString(), error: ultimoError };
+      console.log(`✓ Semáforos de Proyección: ${Object.keys(porId).length} productos, corte ${fechaCorte}`);
+    } else {
+      SEMAFOROS.error = ultimoError || 'No se pudo consultar la Proyección del dashboard';
+      console.error('Semáforos Proyección:', SEMAFOROS.error);
+    }
+  } catch(e) { SEMAFOROS.error = e.message; console.error('Error semáforos Proyección:', e.message); }
 }
 
-// Reglas de semáforo por marca — MISMAS que el módulo Inventario del dashboard
-const INVENTARIO_REGLAS_MARCA = {
-  'BIOSKIN':   { minimo: 1, amarillo: 1.5 },
-  'ZIAJA':     { minimo: 3, amarillo: 4 },
-  'ZIAJA PRO': { minimo: 3, amarillo: 4 },
-  'ERAYBA':    { minimo: 3, amarillo: 4 }
-};
-function calcularSemaforo(marca, coberturaMeses) {
-  const r = INVENTARIO_REGLAS_MARCA[marca] || { minimo: 3, amarillo: 4 };
-  if (coberturaMeses < r.minimo) return 'rojo';
-  if (coberturaMeses < r.amarillo) return 'amarillo';
-  return 'verde';
-}
-
-// Rotación mensual: promedio de los 3 meses cerrados antes del corte (igual que dashboard)
-function calcularRotacionMensual(fechaCorte) {
-  const [anioCorte, mesCorte] = (fechaCorte||'').split('-').map(Number);
-  if (!anioCorte) return {};
-  const meses3 = [];
-  let a = anioCorte, m = mesCorte;
-  for (let i = 0; i < 3; i++) { m -= 1; if (m === 0) { m = 12; a -= 1; } meses3.push({ anio: a, mes: m }); }
-  const acumulado = {};
-  Object.values(VENTAS_CACHE||{}).forEach(clientes => {
-    (clientes||[]).forEach(cli => {
-      (cli.productos_mes||[]).forEach(pm => {
-        if (!meses3.some(x => x.anio===pm.anio && x.mes===pm.mes)) return;
-        const key = pm.id || pm.nombre;
-        acumulado[key] = (acumulado[key]||0) + (pm.cantidad||0);
-      });
-    });
-  });
-  const rot = {};
-  Object.entries(acumulado).forEach(([id, total]) => { rot[id] = total/3; });
-  return rot;
-}
-
-// Catálogo de canje: todos los productos con su semáforo (el cliente solo ve verdes)
+// Catálogo de canje: productos con su semáforo de Proyección (cliente solo ve verdes)
 function construirCatalogoCanje() {
-  if (!INVENTARIO_CACHE) return { fecha_corte: null, productos: [] };
-  const rotacion = calcularRotacionMensual(INVENTARIO_CACHE.fecha_corte);
   const lista = Object.entries(catalogoProductos)
     .filter(([id, info]) => {
       const n = (info.nombre||'').trim().toUpperCase();
       return info.nombre && !n.startsWith('PROMO') && !n.startsWith('LÍNEA') && !n.startsWith('LINEA');
     })
     .map(([id, info]) => {
-      const inv = INVENTARIO_CACHE.productos[id];
-      const stock = inv ? inv.cantidad : 0;
-      const rotMensual = rotacion[id] || 0;
-      const cobertura = rotMensual > 0 ? stock/rotMensual : (stock > 0 ? 99 : 0);
       // Precio y foto: primero la web (PVP de cosetika.com, cruzado por SKU);
       // si el producto no está en la web, cae al precio del catálogo de Contifico.
       const woo = wooPorSku[(info.codigo||'').trim()] || null;
@@ -222,11 +199,12 @@ function construirCatalogoCanje() {
         imagen: woo ? woo.imagen : null,
         precio_fuente: (woo && woo.precio > 0) ? 'web' : (info.precio > 0 ? 'contifico' : null),
         en_web: !!woo,
-        semaforo: calcularSemaforo(info.marca, cobertura)
+        // Sin dato en la Proyección → se trata como rojo (no canjeable), por seguridad
+        semaforo: SEMAFOROS.porId[id] || 'rojo'
       };
     })
     .sort((a,b) => a.marca.localeCompare(b.marca) || a.nombre.localeCompare(b.nombre));
-  return { fecha_corte: INVENTARIO_CACHE.fecha_corte, productos: lista };
+  return { fecha_corte: SEMAFOROS.fecha_corte, productos: lista };
 }
 
 // Regla de visibilidad para clientes: inventario VERDE + precio y foto de la WEB.
@@ -392,13 +370,13 @@ async function initDB() {
 }
 
 initDB()
-  .then(() => cargarDataDashboard())
   .then(() => sincronizarCatalogo())
+  .then(() => cargarSemaforos())
   .then(() => sincronizarWoo())
   .then(() => sincronizarCompras(3))
   .catch(e => console.error('Error init:', e.message));
 setInterval(() => sincronizarCompras(3).catch(e=>console.error(e)), 30 * 60 * 1000);       // compras cada 30 min
-setInterval(() => cargarDataDashboard().catch(e=>console.error(e)), 60 * 60 * 1000);       // semáforo cada hora
+setInterval(() => cargarSemaforos().catch(e=>console.error(e)), 15 * 60 * 1000);           // semáforo Proyección cada 15 min
 setInterval(() => sincronizarCatalogo().catch(e=>console.error(e)), 24 * 60 * 60 * 1000);  // catálogo diario
 setInterval(() => sincronizarWoo().catch(e=>console.error(e)), 6 * 60 * 60 * 1000);        // precios/fotos web cada 6 h
 
@@ -685,9 +663,8 @@ const server = http.createServer(async (req, res) => {
       ok: true,
       catalogo: { total: Object.keys(catalogoProductos).length, synced_at: catalogoSyncedAt },
       web: { productos: Object.keys(wooPorSku).length, synced_at: wooSyncedAt, error: wooUltimoError },
-      inventario_corte: INVENTARIO_CACHE?.fecha_corte || null,
-      ventas_data: !!VENTAS_CACHE,
-      regla: '10% del total con IVA · precios PVP de cosetika.com'
+      proyeccion: { productos: Object.keys(SEMAFOROS.porId).length, fecha_corte: SEMAFOROS.fecha_corte, synced_at: SEMAFOROS.synced_at, error: SEMAFOROS.error },
+      regla: '10% del total con IVA · precios PVP de cosetika.com · semáforo del panel Proyección'
     });
     return;
   }
