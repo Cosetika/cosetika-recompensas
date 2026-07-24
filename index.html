@@ -133,6 +133,7 @@ async function login(){
     sessionStorage.setItem('recompensas_sesion', JSON.stringify(sesion));
     tabActual = 'inicio'; carrito = {};
     render();
+    activarPush(false); // intenta activar notificaciones sin molestar si el navegador no deja
   }catch(e){
     err.textContent = e.message || 'Usuario o contraseña incorrectos';
     btn.disabled = false; btn.innerHTML = '<i class="ti ti-login"></i> Entrar';
@@ -153,6 +154,7 @@ function shell(contenido, tabs){
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
+        <div class="icon-btn" title="Activar notificaciones" onclick="activarPush(true)"><i class="ti ti-bell"></i></div>
         <div class="icon-btn" title="Actualizar" onclick="render()"><i class="ti ti-refresh"></i></div>
         <div class="icon-btn" title="Cerrar sesión" onclick="if(confirm('¿Cerrar sesión?'))logout()"><i class="ti ti-logout"></i></div>
       </div>
@@ -659,8 +661,43 @@ async function solicitarCanje(){
   }catch(e){ toast(e.message); }
 }
 
+// ═══════════════════ NOTIFICACIONES PUSH ═══════════════════
+function urlB64(s){
+  const padding = '='.repeat((4 - s.length % 4) % 4);
+  const base64 = (s + padding).replace(/-/g,'+').replace(/_/g,'/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+}
+
+async function activarPush(manual){
+  try{
+    if(!sesion){ if(manual) toast('Primero inicia sesión'); return; }
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+      if(manual) toast('Este navegador no soporta notificaciones. En iPhone: añade la app a la pantalla de inicio primero.');
+      return;
+    }
+    const kd = await api('/api/push/vapid-key');
+    if(!kd.publicKey){ if(manual) toast('Notificaciones no configuradas en el servidor'); return; }
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    const perm = await Notification.requestPermission();
+    if(perm !== 'granted'){ if(manual) toast('Permiso de notificaciones denegado en el navegador'); return; }
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: urlB64(kd.publicKey) });
+    }
+    await api('/api/push/subscribe', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      subscription: sub,
+      tipo: sesion.tipo==='cliente' ? 'cliente' : 'equipo',
+      cliente_id: sesion.cliente_id || null,
+      nombre: sesion.nombre || ''
+    })});
+    if(manual) toast('Notificaciones activadas 🔔');
+  }catch(e){ if(manual) toast('No se pudo activar: '+e.message); }
+}
+
 // ═══════════════════ INICIO ═══════════════════
 render();
+if(sesion) activarPush(false);
 </script>
 </body>
 </html>

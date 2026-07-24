@@ -9,11 +9,92 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
+let webpush; try { webpush = require('web-push'); } catch(e) { console.log('web-push no instalado'); }
 
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.CONTIFICO_API_KEY || '';
 const REGLA_PCT = 0.10; // 10% exacto sobre el TOTAL CON IVA de la factura
 // (los precios del catálogo de canje son PVP con IVA, así que la base también lo es)
+
+// ─── PUSH NOTIFICATIONS (mismas claves VAPID del dashboard) ──────────────────
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
+if (webpush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails('mailto:info@cosetika.com', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  console.log('✓ Web Push VAPID configurado');
+}
+
+// Envía push a un grupo de suscripciones (limpia las expiradas automáticamente)
+async function enviarPush(whereSql, params, payload) {
+  if (!webpush || !VAPID_PUBLIC_KEY) return;
+  try {
+    const r = await pool.query(`SELECT endpoint, p256dh, auth, nombre FROM recompensas_push WHERE ${whereSql}`, params);
+    if (!r.rows.length) return;
+    const cuerpo = JSON.stringify(payload);
+    await Promise.allSettled(r.rows.map(async sub => {
+      try {
+        await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, cuerpo);
+      } catch(e) {
+        if (e.statusCode === 410 || e.statusCode === 404) {
+          await pool.query('DELETE FROM recompensas_push WHERE endpoint=$1', [sub.endpoint]);
+        }
+      }
+    }));
+    console.log(`🔔 Push (${r.rows.length} dispositivos): ${payload.title}`);
+  } catch(e) { console.error('Error push:', e.message); }
+}
+function pushEquipo(payload) { return enviarPush(`tipo='equipo'`, [], payload); }
+function pushCliente(clienteId, payload) { return enviarPush(`tipo='cliente' AND cliente_id=$1`, [clienteId], payload); }
+
+// Correo (Brevo, API HTTP — Railway bloquea SMTP): avisos de canjes.
+// Env: BREVO_API_KEY (clave api de Brevo) · MAIL_FROM (remitente verificado en Brevo,
+// ej. info@cosetika.com) · MAIL_EQUIPO (correos del equipo separados por comas).
+const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
+const MAIL_FROM = process.env.MAIL_FROM || '';
+const MAIL_EQUIPO = (process.env.MAIL_EQUIPO || '').split(',').map(s=>s.trim()).filter(Boolean);
+
+async function enviarCorreo(destinos, asunto, html) {
+  if (!BREVO_API_KEY || !MAIL_FROM || !destinos.length) return { ok:false, error:'Correo no configurado' };
+  try {
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        sender: { email: MAIL_FROM, name: 'COSÉTIKA Recompensas' },
+        to: destinos.map(e => ({ email: e })),
+        subject: asunto,
+        htmlContent: html
+      })
+    });
+    if (!resp.ok) {
+      const t = await resp.text().catch(()=> '');
+      console.error('Error correo Brevo:', resp.status, t.slice(0,200));
+      return { ok:false, error:`HTTP ${resp.status}` };
+    }
+    console.log(`✉️ Correo enviado a ${destinos.join(', ')}: ${asunto}`);
+    return { ok:true };
+  } catch(e) { console.error('Error correo:', e.message); return { ok:false, error:e.message }; }
+}
+
+function htmlCorreo(titulo, cuerpo) {
+  return `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;border:1px solid #eee;border-radius:12px;overflow:hidden">
+    <div style="background:#1a0e08;padding:18px;text-align:center">
+      <span style="color:#fff;font-size:18px;letter-spacing:3px">COSÉTIKA</span><br>
+      <span style="color:#e8c9a8;font-size:11px;letter-spacing:1px">Plan de Recompensas</span>
+    </div>
+    <div style="padding:22px;color:#333;font-size:14px;line-height:1.6">
+      <h2 style="color:#A0684A;font-size:17px;margin:0 0 12px">${titulo}</h2>
+      ${cuerpo}
+    </div>
+  </div>`;
+}
+
+function htmlItemsCanje(items, total) {
+  return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:10px 0">
+    ${items.map(it=>`<tr><td style="padding:4px 0;border-bottom:1px solid #eee">${it.qty}× ${it.nombre}</td><td style="padding:4px 0;border-bottom:1px solid #eee;text-align:right">$${(it.precio*it.qty).toFixed(2)}</td></tr>`).join('')}
+    <tr><td style="padding:6px 0;font-weight:bold">Total</td><td style="padding:6px 0;text-align:right;font-weight:bold;color:#A0684A">$${total.toFixed(2)}</td></tr>
+  </table>`;
+}
 
 // WooCommerce (cosetika.com): fuente de PRECIOS (PVP web) y FOTOS de productos.
 // Claves de solo lectura generadas en WooCommerce → Ajustes → Avanzado → REST API.
@@ -301,7 +382,7 @@ async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null) {
 // ─── SALDOS ──────────────────────────────────────────────────────────────────
 async function resumenCliente(clienteId) {
   const rCli = await pool.query(
-    `SELECT id, ruc, nombre, contacto, ciudad, usuario, password, TO_CHAR(desde,'YYYY-MM-DD') AS desde, activo
+    `SELECT id, ruc, nombre, contacto, ciudad, usuario, password, email, TO_CHAR(desde,'YYYY-MM-DD') AS desde, activo
      FROM recompensas_clientes WHERE id=$1`, [clienteId]);
   if (!rCli.rows.length) return null;
   const rComp = await pool.query(
@@ -374,6 +455,17 @@ async function initDB() {
         actualizado_at TIMESTAMP DEFAULT NOW()
       );
       ALTER TABLE recompensas_permisos ADD COLUMN IF NOT EXISTS ver_claves BOOLEAN DEFAULT false;
+      ALTER TABLE recompensas_clientes ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+      CREATE TABLE IF NOT EXISTS recompensas_push (
+        id SERIAL PRIMARY KEY,
+        tipo VARCHAR(10) NOT NULL,      -- 'equipo' (admin y asesoras) | 'cliente'
+        cliente_id INTEGER,
+        nombre VARCHAR(255),
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT,
+        auth TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
     `);
     console.log('✓ Tablas recompensas_* listas');
   } catch(e) { console.error('Error initDB:', e.message); }
@@ -444,6 +536,23 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── PUSH: clave pública y suscripción de dispositivos ──
+  if (urlPath === '/api/push/vapid-key' && req.method === 'GET') {
+    json(res, 200, { publicKey: VAPID_PUBLIC_KEY });
+    return;
+  }
+  if (urlPath === '/api/push/subscribe' && req.method === 'POST') {
+    const { subscription, tipo, cliente_id, nombre } = await bodyJSON(req);
+    if (!subscription || !subscription.endpoint || !['equipo','cliente'].includes(tipo)) { json(res, 400, { ok:false, error:'Datos inválidos' }); return; }
+    await pool.query(
+      `INSERT INTO recompensas_push(tipo, cliente_id, nombre, endpoint, p256dh, auth)
+       VALUES($1,$2,$3,$4,$5,$6)
+       ON CONFLICT(endpoint) DO UPDATE SET tipo=$1, cliente_id=$2, nombre=$3, p256dh=$5, auth=$6`,
+      [tipo, cliente_id||null, nombre||'', subscription.endpoint, subscription.keys?.p256dh||null, subscription.keys?.auth||null]);
+    json(res, 200, { ok:true });
+    return;
+  }
+
   // ── ADMIN: equipo con acceso a Recompensas ──
   if (urlPath === '/api/admin/equipo' && req.method === 'GET') {
     const r = await pool.query(`
@@ -503,14 +612,14 @@ const server = http.createServer(async (req, res) => {
 
   // ── ADMIN: crear cliente (dispara backfill desde su fecha "desde") ──
   if (urlPath === '/api/admin/clientes' && req.method === 'POST') {
-    const { ruc, nombre, contacto, ciudad, usuario, password, desde } = await bodyJSON(req);
+    const { ruc, nombre, contacto, ciudad, usuario, password, desde, email } = await bodyJSON(req);
     if (!ruc || !nombre || !usuario || !password) { json(res, 400, { ok:false, error:'Faltan ruc, nombre, usuario o contraseña' }); return; }
     if (!/^\d{10}(\d{3})?$/.test(ruc.trim())) { json(res, 400, { ok:false, error:'La cédula debe tener 10 dígitos o el RUC 13' }); return; }
     try {
       const r = await pool.query(
-        `INSERT INTO recompensas_clientes(ruc, nombre, contacto, ciudad, usuario, password, desde)
-         VALUES($1,$2,$3,$4,$5,$6, COALESCE($7::date, CURRENT_DATE)) RETURNING id`,
-        [ruc.trim(), nombre.trim(), contacto||null, ciudad||null, usuario.trim(), password, desde||null]);
+        `INSERT INTO recompensas_clientes(ruc, nombre, contacto, ciudad, usuario, password, desde, email)
+         VALUES($1,$2,$3,$4,$5,$6, COALESCE($7::date, CURRENT_DATE), $8) RETURNING id`,
+        [ruc.trim(), nombre.trim(), contacto||null, ciudad||null, usuario.trim(), password, desde||null, (email||'').trim()||null]);
       const nuevoId = r.rows[0].id;
       // Backfill en background desde su fecha de inicio (si es hoy, casi instantáneo)
       sincronizarCompras(0, nuevoId).catch(e=>console.error(e));
@@ -526,7 +635,7 @@ const server = http.createServer(async (req, res) => {
   const mCli = urlPath.match(/^\/api\/admin\/clientes\/(\d+)$/);
   if (mCli && req.method === 'PUT') {
     const body = await bodyJSON(req);
-    const permitidas = ['nombre','contacto','ciudad','password','activo','ruc','desde'];
+    const permitidas = ['nombre','contacto','ciudad','password','activo','ruc','desde','email'];
     const cols = Object.keys(body).filter(k => permitidas.includes(k));
     if (cols.length) {
       const sets = cols.map((k,i)=>`${k}=$${i+1}`).join(',');
@@ -561,6 +670,28 @@ const server = http.createServer(async (req, res) => {
     const { estado } = await bodyJSON(req);
     if (!['aprobado','rechazado','entregado'].includes(estado)) { json(res, 400, { ok:false, error:'Estado inválido' }); return; }
     await pool.query(`UPDATE recompensas_canjes SET estado=$1, resuelto_at=NOW() WHERE id=$2`, [estado, mCanje[1]]);
+    // Avisar al cliente cuando se aprueba (push + correo si tiene email registrado)
+    if (estado === 'aprobado') {
+      try {
+        const rk = await pool.query(
+          `SELECT k.total, k.items, c.id AS cliente_id, c.nombre, c.email
+           FROM recompensas_canjes k JOIN recompensas_clientes c ON c.id=k.cliente_id WHERE k.id=$1`, [mCanje[1]]);
+        if (rk.rows.length) {
+          const k = rk.rows[0];
+          pushCliente(k.cliente_id, {
+            title: '🎉 ¡Tu canje fue aprobado!',
+            body: `Tus productos ($${parseFloat(k.total).toFixed(2)}) llegarán gratis con tu próximo pedido COSÉTIKA`,
+            tag: 'canje-aprobado-' + mCanje[1], url: '/'
+          }).catch(()=>{});
+          if (k.email) {
+            const items = JSON.parse(k.items||'[]');
+            enviarCorreo([k.email], '🎉 Tu canje COSÉTIKA fue aprobado',
+              htmlCorreo('¡Tu canje fue aprobado!', `<p>Hola <b>${k.nombre}</b>, aprobamos tu canje:</p>${htmlItemsCanje(items, parseFloat(k.total))}<p>Tus productos llegarán <b>gratis junto con tu próximo pedido</b>. 💛</p>`)
+            ).catch(()=>{});
+          }
+        }
+      } catch(e) { console.error('Error avisando canje aprobado:', e.message); }
+    }
     json(res, 200, { ok:true });
     return;
   }
@@ -651,6 +782,18 @@ const server = http.createServer(async (req, res) => {
     const r = await pool.query(
       `INSERT INTO recompensas_canjes(cliente_id, items, total) VALUES($1,$2,$3) RETURNING id`,
       [clienteId, JSON.stringify(itemsValidados), total]);
+    // Avisar al equipo COSÉTIKA (push + correo si está configurado) — sin bloquear la respuesta
+    const resumenItems = itemsValidados.map(it=>`${it.qty}× ${it.nombre}`).join(', ');
+    pushEquipo({
+      title: `🎁 Canje de ${resumen.cliente.nombre} · $${total.toFixed(2)}`,
+      body: resumenItems.slice(0, 120) + ' — entra a aprobarlo',
+      tag: 'canje-' + r.rows[0].id, url: '/'
+    }).catch(()=>{});
+    if (MAIL_EQUIPO.length) {
+      enviarCorreo(MAIL_EQUIPO, `Nueva solicitud de canje — ${resumen.cliente.nombre} ($${total.toFixed(2)})`,
+        htmlCorreo('Nueva solicitud de canje', `<p><b>${resumen.cliente.nombre}</b> solicitó un canje:</p>${htmlItemsCanje(itemsValidados, total)}<p>Entra a la app para aprobarlo o rechazarlo.</p>`)
+      ).catch(()=>{});
+    }
     json(res, 200, { ok:true, id: r.rows[0].id, total });
     return;
   }
