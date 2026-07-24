@@ -258,10 +258,11 @@ async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null) {
       if (!resp.ok) break;
       const data = await resp.json();
       for (const d of (data.results || [])) {
-        // Mismos filtros que el dashboard (generarDataJson)
         if (d.tipo_registro !== 'CLI') continue;
         if (d.anulado) continue;
-        if (['NC','COT','PRO'].includes(d.tipo_documento)) continue;
+        // SOLO facturas (FAC): Contifico registra además pedidos/pre-facturas de la
+        // misma venta (ej. numeración 2026xxxxxxx) que duplicarían la recompensa.
+        if (d.tipo_documento !== 'FAC') continue;
         const docKey = String(d.id || d.documento);
         if (documentosVistos.has(docKey)) continue;
         documentosVistos.add(docKey);
@@ -384,7 +385,8 @@ initDB()
   .then(() => sincronizarWoo())
   .then(() => sincronizarCompras(3))
   .catch(e => console.error('Error init:', e.message));
-setInterval(() => sincronizarCompras(3).catch(e=>console.error(e)), 30 * 60 * 1000);       // compras cada 30 min
+setInterval(() => sincronizarCompras(1).catch(e=>console.error(e)), 5 * 60 * 1000);        // facturas del día cada 5 min
+setInterval(() => sincronizarCompras(7).catch(e=>console.error(e)), 6 * 60 * 60 * 1000);   // repaso de la semana cada 6 h
 setInterval(() => cargarSemaforos().catch(e=>console.error(e)), 15 * 60 * 1000);           // semáforo Proyección cada 15 min
 setInterval(() => sincronizarCatalogo().catch(e=>console.error(e)), 24 * 60 * 60 * 1000);  // catálogo diario
 setInterval(() => sincronizarWoo().catch(e=>console.error(e)), 6 * 60 * 60 * 1000);        // precios/fotos web cada 6 h
