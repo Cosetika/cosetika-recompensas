@@ -228,6 +228,52 @@ async function sincronizarWoo() {
   }
 }
 
+// ─── ELEGIBILIDAD PARA EL 10%: solo productos "retail / uso en casa" ─────────
+// ZIAJA → todo elegible · ERAYBA → solo los marcados en recompensas_elegibles
+// (editable con checkbox en la vista admin del Catálogo) · ZIAJA PRO, BIOSKIN
+// y cualquier otra marca → nunca. El catálogo de CANJE no cambia: esto solo
+// define qué líneas de la factura GENERAN saldo.
+let ELEGIBLES_ERAYBA = new Set();
+
+async function cargarElegibles() {
+  try {
+    const r = await pool.query('SELECT producto_id FROM recompensas_elegibles');
+    ELEGIBLES_ERAYBA = new Set(r.rows.map(x => x.producto_id));
+  } catch(e) { console.error('Error cargando elegibles:', e.message); }
+}
+
+// Primera vez (tabla vacía): marca automáticamente el retail de ERAYBA acordado
+// con Fernando — presentaciones pequeñas, EXCEPTO los Smooting Treatment (uso
+// profesional) y todo formato de 1000ml (cabina). Después manda lo guardado en BD.
+async function inicializarElegibles() {
+  try {
+    const r = await pool.query('SELECT COUNT(*) AS n FROM recompensas_elegibles');
+    if (parseInt(r.rows[0].n) === 0 && Object.keys(catalogoProductos).length > 0) {
+      let sembrados = 0;
+      for (const [id, info] of Object.entries(catalogoProductos)) {
+        if ((info.marca||'').toUpperCase().replace(/\s+/g,'') !== 'ERAYBA') continue;
+        const n = (info.nombre||'').toUpperCase();
+        if (/1000\s*ML/.test(n)) continue;                 // formato cabina
+        if (n.includes('SMOOTING TREATMENT')) continue;    // uso profesional (todas las presentaciones)
+        await pool.query('INSERT INTO recompensas_elegibles(producto_id) VALUES($1) ON CONFLICT DO NOTHING', [id]);
+        sembrados++;
+      }
+      console.log(`✓ Elegibles ERAYBA sembrados por primera vez: ${sembrados} productos retail`);
+    }
+    await cargarElegibles();
+    console.log(`✓ Elegibles para el 10%: ZIAJA completa + ${ELEGIBLES_ERAYBA.size} productos ERAYBA retail`);
+  } catch(e) { console.error('Error inicializando elegibles:', e.message); }
+}
+
+function esElegibleRecompensa(prodId) {
+  const info = catalogoProductos[prodId];
+  if (!info) return false;
+  const marca = (info.marca||'').toUpperCase().replace(/\s+/g,'');
+  if (marca === 'ZIAJA') return true;      // 'ZIAJAPRO' normalizado NO entra aquí
+  if (marca === 'ERAYBA') return ELEGIBLES_ERAYBA.has(prodId);
+  return false;
+}
+
 // ─── SEMÁFORO: directo del panel PROYECCIÓN del dashboard ────────────────────
 // En vez de recalcular, se consulta /api/inventario del dashboard — la MISMA
 // fuente que pinta la Proyección (bodegas POS + Casa unificadas, sincronizadas
@@ -281,7 +327,9 @@ function construirCatalogoCanje() {
         precio_fuente: (woo && woo.precio > 0) ? 'web' : (info.precio > 0 ? 'contifico' : null),
         en_web: !!woo,
         // Sin dato en la Proyección → se trata como rojo (no canjeable), por seguridad
-        semaforo: SEMAFOROS.porId[id] || 'rojo'
+        semaforo: SEMAFOROS.porId[id] || 'rojo',
+        // Elegibilidad para GENERAR el 10% (no afecta qué se puede canjear)
+        genera_10: esElegibleRecompensa(id)
       };
     })
     .sort((a,b) => a.marca.localeCompare(b.marca) || a.nombre.localeCompare(b.nombre));
@@ -300,6 +348,7 @@ let syncEnProceso = false;
 async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null) {
   if (!API_KEY) return { ok:false, error:'Sin CONTIFICO_API_KEY' };
   if (syncEnProceso) return { ok:false, error:'Sync ya en proceso' };
+  if (Object.keys(catalogoProductos).length === 0) return { ok:false, error:'Catálogo aún no cargado — reintenta en un minuto' };
   syncEnProceso = true;
   try {
     const params = clienteIdFiltro ? [clienteIdFiltro] : [];
@@ -352,10 +401,19 @@ async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null) {
         if (!cli) continue;
         const fechaSQL = fechaDocASQL(d.fecha_emision);
         if (!fechaSQL || fechaSQL < cli.desde) continue; // solo compras desde la fecha de alta
-        // Base de la recompensa: TOTAL CON IVA de la factura (columna "subtotal" de la
-        // tabla guarda este monto base — el nombre quedó del diseño inicial sin IVA).
-        const montoBase = Math.round(parseFloat(d.total || 0)*100)/100;
-        if (montoBase <= 0) continue; // ej. la propia factura de un canje al 100% dcto.
+        // Base de la recompensa: SOLO las líneas de productos retail/uso en casa
+        // (ZIAJA completa + ERAYBA marcados), valoradas CON IVA por línea.
+        // La columna "subtotal" de la tabla guarda este monto base elegible.
+        let montoBase = 0;
+        for (const det of (d.detalles || [])) {
+          if (!det.producto_id || !esElegibleRecompensa(det.producto_id)) continue;
+          const base = parseFloat(det.base_gravable || det.base_cero || 0);
+          if (base <= 0) continue; // regalos / 100% dcto. no generan saldo
+          const ivaPct = parseFloat(det.porcentaje_iva);
+          montoBase += base * (1 + (isNaN(ivaPct) ? 15 : ivaPct) / 100);
+        }
+        montoBase = Math.round(montoBase * 100) / 100;
+        if (montoBase <= 0) continue; // factura sin productos elegibles → sin saldo
         const recompensa = Math.round(montoBase * REGLA_PCT * 100)/100;
         revisados++;
         const r = await pool.query(
@@ -456,6 +514,11 @@ async function initDB() {
       );
       ALTER TABLE recompensas_permisos ADD COLUMN IF NOT EXISTS ver_claves BOOLEAN DEFAULT false;
       ALTER TABLE recompensas_clientes ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+      CREATE TABLE IF NOT EXISTS recompensas_elegibles (
+        id SERIAL PRIMARY KEY,
+        producto_id VARCHAR(100) UNIQUE NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
       CREATE TABLE IF NOT EXISTS recompensas_push (
         id SERIAL PRIMARY KEY,
         tipo VARCHAR(10) NOT NULL,      -- 'equipo' (admin y asesoras) | 'cliente'
@@ -473,6 +536,7 @@ async function initDB() {
 
 initDB()
   .then(() => sincronizarCatalogo())
+  .then(() => inicializarElegibles())
   .then(() => cargarSemaforos())
   .then(() => sincronizarWoo())
   .then(() => sincronizarCompras(3))
@@ -798,6 +862,22 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── ADMIN: marcar/desmarcar producto ERAYBA como retail (genera 10%) ──
+  if (urlPath === '/api/admin/elegibles' && req.method === 'POST') {
+    const { producto_id, elegible } = await bodyJSON(req);
+    if (!producto_id) { json(res, 400, { ok:false, error:'Falta producto_id' }); return; }
+    const info = catalogoProductos[producto_id];
+    if (!info || (info.marca||'').toUpperCase().replace(/\s+/g,'') !== 'ERAYBA') {
+      json(res, 400, { ok:false, error:'Solo los productos ERAYBA se marcan manualmente (ZIAJA siempre genera; ZIAJA PRO y BIOSKIN nunca)' });
+      return;
+    }
+    if (elegible) await pool.query('INSERT INTO recompensas_elegibles(producto_id) VALUES($1) ON CONFLICT DO NOTHING', [producto_id]);
+    else await pool.query('DELETE FROM recompensas_elegibles WHERE producto_id=$1', [producto_id]);
+    await cargarElegibles();
+    json(res, 200, { ok:true });
+    return;
+  }
+
   // ── ADMIN: forzar sync de precios/fotos de la web ──
   if (urlPath === '/api/admin/sync-woo' && req.method === 'GET') {
     await sincronizarWoo();
@@ -828,7 +908,8 @@ const server = http.createServer(async (req, res) => {
       catalogo: { total: Object.keys(catalogoProductos).length, synced_at: catalogoSyncedAt },
       web: { productos: Object.keys(wooPorSku).length, synced_at: wooSyncedAt, error: wooUltimoError },
       proyeccion: { productos: Object.keys(SEMAFOROS.porId).length, fecha_corte: SEMAFOROS.fecha_corte, synced_at: SEMAFOROS.synced_at, error: SEMAFOROS.error },
-      regla: '10% del total con IVA · precios PVP de cosetika.com · semáforo del panel Proyección'
+      elegibles_erayba: ELEGIBLES_ERAYBA.size,
+      regla: '10% con IVA solo de productos retail (ZIAJA + ERAYBA marcados) · precios PVP web · semáforo Proyección'
     });
     return;
   }

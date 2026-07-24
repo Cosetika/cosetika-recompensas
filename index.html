@@ -238,8 +238,9 @@ async function renderAdmin(){
         <div class="card" style="background:var(--bl);border-color:rgba(160,104,74,0.25)">
           <div style="font-size:12px;color:var(--brown-dark);line-height:1.5">
             <i class="ti ti-refresh" style="color:var(--brown)"></i>
-            La app revisa Contifico <b>cada minuto</b> y acredita el <b>10% del total de la factura
-            (con IVA)</b> al RUC de cada estética. Sin registro manual.
+            La app revisa Contifico <b>cada minuto</b> y acredita el <b>10% (con IVA) de los
+            productos de uso en casa</b> de cada factura: toda la línea ZIAJA y el retail de
+            ERAYBA (marcado en Catálogo). ZIAJA PRO y BIOSKIN no generan saldo.
           </div>
         </div>`;
     }
@@ -382,15 +383,23 @@ async function renderAdmin(){
             <b style="color:var(--verde-txt)">${visibles} visibles para clientes</b>${ocultos?` · ${ocultos} ocultos por inventario bajo`:''}
           </p>
           <div class="buscador"><i class="ti ti-search"></i><input class="input" placeholder="Buscar producto o marca..." value="${filtroCat}" oninput="filtroCat=this.value;render()"/></div>
-          ${lista.slice(0,150).map(p=>`
+          ${lista.slice(0,150).map(p=>{
+            const esErayba = (p.marca||'').toUpperCase().replace(/\s+/g,'')==='ERAYBA';
+            return `
             <div class="prod">
               ${prodImg(p)}
               <div style="flex:1;min-width:0">
                 <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.nombre}">${p.nombre}</div>
-                <div style="font-size:10px;color:var(--muted)">${p.marca||''} ${p.marca?'·':''} ${p.precio>0?fmt(p.precio):'<span style="color:var(--rojo)">sin precio en la web</span>'}</div>
+                <div style="font-size:10px;color:var(--muted)">${p.marca||''} ${p.marca?'·':''} ${p.precio>0?fmt(p.precio):'<span style="color:var(--rojo)">sin precio en la web</span>'}
+                  ${p.genera_10?' · <span style="color:var(--verde-txt);font-weight:600">genera 10%</span>':' · <span style="color:var(--muted)">no genera 10%</span>'}
+                </div>
               </div>
+              ${esErayba?`<label style="display:flex;flex-direction:column;align-items:center;gap:1px;font-size:8px;color:var(--muted);cursor:pointer" title="Marcar como retail: sus compras generan el 10%">
+                <input type="checkbox" ${p.genera_10?'checked':''} onchange="cambiarElegible('${p.id}', this.checked)" style="accent-color:var(--brown);width:16px;height:16px;cursor:pointer"/>10%
+              </label>`:''}
               <span class="pill ${p.visible?'pill-verde':'pill-rojo'}" title="Semáforo: ${p.semaforo}">${p.visible?'Visible':'Oculto'}</span>
-            </div>`).join('')}
+            </div>`;
+          }).join('')}
           ${lista.length>150?`<p style="font-size:11px;color:var(--muted);margin-top:8px">Mostrando 150 de ${lista.length} — usa el buscador</p>`:''}
         </div>`;
     }
@@ -443,6 +452,14 @@ async function cambiarNivelEquipo(usuarioId, nivel){
     await api('/api/admin/equipo', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({usuario_id: usuarioId, nivel}) });
     toast(nivel==='ninguno' ? 'Acceso retirado' : nivel==='ver' ? 'Acceso de solo lectura ✓' : 'Acceso con creación de clientes ✓');
   }catch(e){ toast(e.message); }
+}
+
+async function cambiarElegible(productoId, elegible){
+  try{
+    await api('/api/admin/elegibles', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({producto_id: productoId, elegible}) });
+    toast(elegible ? 'Ahora genera el 10% ✓' : 'Ya no genera el 10%');
+    render();
+  }catch(e){ toast(e.message); render(); }
 }
 
 async function cambiarClavesEquipo(usuarioId, activo){
@@ -547,10 +564,10 @@ async function renderCliente(){
         <div class="card">
           <div class="card-title"><i class="ti ti-sparkles"></i> ¿Cómo funciona?</div>
           <div style="font-size:12px;color:var(--muted);line-height:1.6">
-            Cada compra tuya a COSÉTIKA te devuelve el <b style="color:var(--brown)">10%</b> del
-            valor de tu factura en saldo para canjear por productos. Se acredita automáticamente
-            con cada compra — no tienes que hacer nada. Al canjear, los productos llegan
-            <b>gratis en tu próximo pedido</b>.
+            Tus compras de <b>productos de uso en casa</b> (línea ZIAJA y retail de ERAYBA)
+            te devuelven el <b style="color:var(--brown)">10%</b> de su valor en saldo para
+            canjear por productos. Se acredita automáticamente con cada factura — no tienes
+            que hacer nada. Al canjear, los productos llegan <b>gratis en tu próximo pedido</b>.
           </div>
         </div>
         <div class="card">
