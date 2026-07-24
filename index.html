@@ -142,14 +142,14 @@ function logout(){ sesion=null; sessionStorage.removeItem('recompensas_sesion');
 
 // ═══════════════════ LAYOUT ═══════════════════
 function shell(contenido, tabs){
-  const quien = sesion.tipo==='admin' ? (sesion.nombre||'Administrador') : sesion.nombre;
+  const sub = sesion.tipo==='cliente' ? 'Plan de Recompensas' : `Plan de Recompensas · ${sesion.nombre||'Administrador'}`;
   document.getElementById('app').innerHTML = `
     <div class="header">
       <div class="logo">
         <div class="logo-c">C</div>
         <div>
           <div class="logo-name">COSÉTIKA</div>
-          <div class="logo-sl">Recompensas · ${quien}</div>
+          <div class="logo-sl">${sub}</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
@@ -524,6 +524,7 @@ async function renderCliente(){
     if(tabActual==='inicio'){
       html = `
         <div class="saldo-hero">
+          <div style="font-size:19px;font-weight:700;color:#fff;margin-bottom:10px;position:relative;z-index:1">${sesion.nombre}</div>
           <div style="font-size:10px;letter-spacing:2px;color:#e8c9a8;text-transform:uppercase">Saldo disponible</div>
           <div style="font-size:38px;font-weight:800;margin:4px 0">${fmt(RESUMEN.saldo_disponible)}</div>
           <div style="font-size:11px;color:rgba(255,255,255,0.75)">Generado: ${fmt(RESUMEN.saldo_generado)} · Canjeado: ${fmt(RESUMEN.saldo_canjeado)}</div>
