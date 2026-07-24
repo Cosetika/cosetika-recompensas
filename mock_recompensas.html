@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>COSÉTIKA — Plan de Recompensas (MOCK)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--brown:#A0684A;--brown-dark:#1a0e08;--bl:rgba(160,104,74,0.12);--bg:#f4f1ee;--card:#fff;--text:#1a1a1a;--muted:#6b6b6b;--border:rgba(0,0,0,0.08);--verde:#1D9E75;--verde-bg:#E1F5EE;--verde-txt:#085041;--rojo:#991b1b;--rojo-bg:#fee2e2}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.header{background:var(--brown-dark);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--brown);position:sticky;top:0;z-index:50}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-c{width:38px;height:38px;background:var(--brown);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;font-style:italic;font-family:Georgia,serif;flex-shrink:0}
+.logo-name{font-size:15px;font-weight:500;letter-spacing:2px;color:#fff}
+.logo-sl{font-size:9px;color:#e8c9a8;letter-spacing:1px}
+.badge-mock{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.3);color:#e8c9a8;font-size:9px;padding:3px 8px;border-radius:20px;letter-spacing:1px}
+.icon-btn{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px}
+.container{max-width:560px;margin:0 auto;padding:14px 14px 90px}
+.card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px}
+.card-title{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;gap:5px}
+.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px}
+.kpi-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.kpi-val{font-size:17px;font-weight:700;color:var(--text);margin-top:2px}
+.tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);display:grid;z-index:50;max-width:560px;margin:0 auto;box-shadow:0 -4px 16px rgba(0,0,0,0.05)}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px;cursor:pointer;color:var(--muted);font-size:10px;font-weight:500;border-top:3px solid transparent}
+.tab.active{color:var(--brown);border-top-color:var(--brown)}
+.tab i{font-size:20px}
+.btn{background:var(--brown);color:#fff;border:none;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;width:100%}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+.btn-outline{background:#fff;color:var(--brown);border:1.5px solid var(--brown);padding:9px 16px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer}
+.input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;outline:none;background:#fff}
+.input:focus{border-color:var(--brown)}
+.lbl{font-size:11px;color:var(--muted);margin:10px 0 4px;display:block;font-weight:500}
+.pill{font-size:10px;padding:3px 10px;border-radius:20px;font-weight:600;white-space:nowrap}
+.pill-verde{background:var(--verde-bg);color:var(--verde-txt)}
+.pill-amarillo{background:#FAEEDA;color:#633806}
+.pill-rojo{background:var(--rojo-bg);color:var(--rojo)}
+.mov{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.mov:last-child{border-bottom:none}
+.mov-ico{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.saldo-hero{background:linear-gradient(135deg,var(--brown-dark),#3d2418);border-radius:16px;padding:22px 18px;color:#fff;margin-bottom:12px;position:relative;overflow:hidden}
+.saldo-hero::after{content:'';position:absolute;right:-30px;top:-30px;width:140px;height:140px;border-radius:50%;background:rgba(160,104,74,0.25)}
+.prod{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.prod:last-child{border-bottom:none}
+.prod-img{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;color:#fff}
+.qty-btn{width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;color:var(--brown);font-weight:700}
+.fadein{animation:fadeIn 0.25s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.progress-track{height:10px;background:#f0ede9;border-radius:5px;overflow:hidden}
+.progress-fill{height:100%;background:var(--brown);border-radius:5px;transition:width 0.4s}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--brown-dark);color:#fff;padding:10px 18px;border-radius:24px;font-size:12px;z-index:200;display:none;box-shadow:0 6px 20px rgba(0,0,0,0.25);max-width:90%;text-align:center}
+.login-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:linear-gradient(160deg,var(--brown-dark) 0%,#2c1810 55%,#3d2418 100%)}
+.login-card{background:#fff;border-radius:18px;padding:26px 22px;width:100%;max-width:380px;box-shadow:0 20px 50px rgba(0,0,0,0.35)}
+.login-user{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);border-radius:12px;cursor:pointer;margin-bottom:10px;transition:all 0.15s}
+.login-user:hover{border-color:var(--brown);background:var(--bl)}
+.avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════ MOCK DATA (todo en memoria — sin backend) ═══════════════════
+// Regla: 10% exacto de cada compra → saldo canjeable (compra $105 → $10,50 de saldo)
+const REGLA_PCT = 0.10;
+
+const MARCA_COLORS = { 'ZIAJA':'#6ee7b7', 'BIOSKIN':'#a5b4fc', 'ERAYBA':'#fcd34d', 'ZIAJA PRO':'#f9a8d4' };
+
+// Catálogo de canje: SOLO productos con inventario en VERDE (en la app real vendría
+// del semáforo de Inventario que ya calcula el dashboard con datos de Contifico)
+const CATALOGO = [
+  {id:1, nombre:'ZIAJA Crema de Caracol 50ml',            marca:'ZIAJA',    precio:12.50, semaforo:'verde'},
+  {id:2, nombre:'ZIAJA Gel Limpiador Aloe 200ml',         marca:'ZIAJA',    precio:8.90,  semaforo:'verde'},
+  {id:3, nombre:'ZIAJA Manteca de Cacao Crema 300ml',     marca:'ZIAJA',    precio:10.75, semaforo:'verde'},
+  {id:4, nombre:'ZIAJA PRO Peeling Enzimático 250ml',     marca:'ZIAJA PRO',precio:24.90, semaforo:'verde'},
+  {id:5, nombre:'BIOSKIN Sérum Vitamina C 30ml',          marca:'BIOSKIN',  precio:28.00, semaforo:'verde'},
+  {id:6, nombre:'BIOSKIN Ácido Hialurónico Ampolla x5',   marca:'BIOSKIN',  precio:19.50, semaforo:'verde'},
+  {id:7, nombre:'ERAYBA Shampoo HydraKer K12 250ml',      marca:'ERAYBA',   precio:15.20, semaforo:'verde'},
+  {id:8, nombre:'ERAYBA Mascarilla Capilar M3 500ml',     marca:'ERAYBA',   precio:22.40, semaforo:'verde'},
+  // Ejemplos NO visibles para el cliente (amarillo/rojo) — se muestran solo en la vista admin como referencia
+  {id:9, nombre:'ZIAJA Protector Solar SPF50 50ml',       marca:'ZIAJA',    precio:14.90, semaforo:'amarillo'},
+  {id:10,nombre:'BIOSKIN Contorno de Ojos 15ml',          marca:'BIOSKIN',  precio:21.00, semaforo:'rojo'},
+];
+
+// Clientes del plan (los crea el admin con cédula/RUC — el saldo se calcula
+// automáticamente desde sus facturas de Contifico)
+let CLIENTES = [
+  {
+    id:1, ruc:'1791234567001', nombre:'Estética Bella Piel', contacto:'Gabriela Ríos', ciudad:'Quito',
+    facturas:[ // simulan las facturas que Contifico ya registra para esta cédula/RUC
+      {doc:'001-002-1145', fecha:'2026-05-12', monto:185.40},
+      {doc:'001-002-1290', fecha:'2026-06-03', monto:242.10},
+      {doc:'001-002-1418', fecha:'2026-07-08', monto:96.75},
+    ],
+    canjes:[ // canjes ya realizados
+      {fecha:'2026-06-20', items:[{nombre:'ZIAJA Gel Limpiador Aloe 200ml', precio:8.90, qty:1}], total:8.90, estado:'entregado'}
+    ]
+  },
+  {
+    id:2, ruc:'0992345678001', nombre:'Estética Luz & Vida', contacto:'Marcela Paz', ciudad:'Guayaquil',
+    facturas:[
+      {doc:'001-002-1201', fecha:'2026-06-15', monto:310.00},
+      {doc:'001-002-1350', fecha:'2026-07-02', monto:158.20},
+    ],
+    canjes:[]
+  },
+];
+
+let sesion = null;        // {tipo:'admin'} | {tipo:'cliente', id}
+let tabActual = 'inicio';
+let carrito = {};         // {productoId: qty}
+
+// ═══════════════════ CÁLCULOS ═══════════════════
+function totalCompras(c){ return c.facturas.reduce((a,f)=>a+f.monto,0); }
+function saldoGenerado(c){ return Math.round(totalCompras(c)*REGLA_PCT*100)/100; }
+function saldoCanjeado(c){ return c.canjes.filter(x=>x.estado!=='rechazado').reduce((a,x)=>a+x.total,0); }
+function saldoDisponible(c){ return Math.round((saldoGenerado(c)-saldoCanjeado(c))*100)/100; }
+function fmt(n){ return '$'+Number(n).toLocaleString('es-EC',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtFecha(f){ const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
+function carritoTotal(){ return Object.entries(carrito).reduce((a,[id,q])=>{ const p=CATALOGO.find(x=>x.id==id); return a+(p?p.precio*q:0); },0); }
+function carritoCount(){ return Object.values(carrito).reduce((a,q)=>a+q,0); }
+function iniciales(n){ return n.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase(); }
+
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.display='block';
+  clearTimeout(window._toastT);
+  window._toastT=setTimeout(()=>{ t.style.display='none'; },2600);
+}
+
+// ═══════════════════ LOGIN ═══════════════════
+function renderLogin(){
+  document.getElementById('app').innerHTML = `
+  <div class="login-wrap">
+    <div style="text-align:center;margin-bottom:22px">
+      <div style="width:64px;height:64px;background:var(--brown);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;color:#fff;font-style:italic;font-family:Georgia,serif">C</div>
+      <div style="font-size:19px;letter-spacing:3px;color:#fff;margin-top:10px;font-weight:500">COSÉTIKA</div>
+      <div style="font-size:11px;color:#e8c9a8;letter-spacing:1px;margin-top:2px">Plan de Recompensas</div>
+      <div style="margin-top:8px"><span class="badge-mock">MOCK · DEMO NAVEGABLE</span></div>
+    </div>
+    <div class="login-card">
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--muted)">Entrar como…</div>
+      <div class="login-user" onclick="login('admin')">
+        <div class="avatar" style="background:var(--brown-dark)"><i class="ti ti-crown"></i></div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:600">COSÉTIKA — Administrador</div>
+          <div style="font-size:11px;color:var(--muted)">Crea clientes, ve saldos y aprueba canjes</div>
+        </div>
+        <i class="ti ti-chevron-right" style="color:var(--muted)"></i>
+      </div>
+      ${CLIENTES.map(c=>`
+      <div class="login-user" onclick="login('cliente',${c.id})">
+        <div class="avatar" style="background:var(--brown)">${iniciales(c.nombre)}</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:600">${c.nombre}</div>
+          <div style="font-size:11px;color:var(--muted)">${c.contacto} · Saldo: <b style="color:var(--brown)">${fmt(saldoDisponible(c))}</b></div>
+        </div>
+        <i class="ti ti-chevron-right" style="color:var(--muted)"></i>
+      </div>`).join('')}
+      <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:10px">En la app real cada perfil entra con su usuario y contraseña</div>
+    </div>
+  </div>`;
+}
+
+function login(tipo,id){
+  sesion = tipo==='admin' ? {tipo:'admin'} : {tipo:'cliente', id};
+  tabActual = 'inicio';
+  carrito = {};
+  render();
+}
+function logout(){ sesion=null; renderLogin(); }
+
+// ═══════════════════ LAYOUT COMÚN ═══════════════════
+function shell(contenido, tabs){
+  const quien = sesion.tipo==='admin' ? 'Administrador' : CLIENTES.find(c=>c.id===sesion.id).nombre;
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <div class="logo">
+        <div class="logo-c">C</div>
+        <div>
+          <div class="logo-name">COSÉTIKA</div>
+          <div class="logo-sl">Plan de Recompensas · ${quien}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="badge-mock">MOCK</span>
+        <div class="icon-btn" title="Cerrar sesión" onclick="logout()"><i class="ti ti-logout"></i></div>
+      </div>
+    </div>
+    <div class="container fadein">${contenido}</div>
+    <div class="tabs" style="grid-template-columns:repeat(${tabs.length},1fr)">
+      ${tabs.map(t=>`
+        <div class="tab ${tabActual===t.id?'active':''}" onclick="setTab('${t.id}')">
+          <i class="ti ti-${t.icono}"></i>${t.label}
+          ${t.badge?`<span style="position:absolute;margin-left:34px;margin-top:-4px;background:var(--rojo);color:#fff;font-size:9px;min-width:15px;height:15px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;padding:0 3px">${t.badge}</span>`:''}
+        </div>`).join('')}
+    </div>`;
+}
+
+function setTab(t){ tabActual=t; render(); }
+
+function render(){
+  if(!sesion){ renderLogin(); return; }
+  if(sesion.tipo==='admin') renderAdmin();
+  else renderCliente();
+}
+
+// ═══════════════════ VISTA ADMIN ═══════════════════
+function renderAdmin(){
+  const canjesPend = CLIENTES.flatMap(c=>c.canjes.filter(x=>x.estado==='pendiente').map(x=>({...x, cliente:c})));
+  const tabs = [
+    {id:'inicio', icono:'users', label:'Clientes'},
+    {id:'canjes', icono:'gift', label:'Canjes', badge:canjesPend.length||''},
+    {id:'nuevo', icono:'user-plus', label:'Nuevo'},
+    {id:'catalogo', icono:'package', label:'Catálogo'},
+  ];
+  let html='';
+
+  if(tabActual==='inicio'){
+    const saldoTotal = CLIENTES.reduce((a,c)=>a+saldoDisponible(c),0);
+    const comprasTotal = CLIENTES.reduce((a,c)=>a+totalCompras(c),0);
+    html = `
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-label">Clientes</div><div class="kpi-val">${CLIENTES.length}</div></div>
+        <div class="kpi"><div class="kpi-label">Compras acum.</div><div class="kpi-val" style="font-size:14px">${fmt(comprasTotal)}</div></div>
+        <div class="kpi"><div class="kpi-label">Saldo por canjear</div><div class="kpi-val" style="font-size:14px;color:var(--brown)">${fmt(saldoTotal)}</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-users"></i> Estéticas en el plan</div>
+        ${CLIENTES.map(c=>`
+          <div class="mov" style="cursor:pointer" onclick="verClienteAdmin(${c.id})">
+            <div class="avatar" style="background:var(--brown);width:38px;height:38px;font-size:12px">${iniciales(c.nombre)}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.nombre}</div>
+              <div style="font-size:11px;color:var(--muted)">RUC ${c.ruc} · ${c.facturas.length} facturas · compras ${fmt(totalCompras(c))}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:14px;font-weight:700;color:var(--brown)">${fmt(saldoDisponible(c))}</div>
+              <div style="font-size:9px;color:var(--muted)">saldo</div>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div class="card" style="background:var(--bl);border-color:rgba(160,104,74,0.25)">
+        <div style="font-size:12px;color:var(--brown-dark);line-height:1.5">
+          <i class="ti ti-refresh" style="color:var(--brown)"></i>
+          <b>Saldo automático:</b> la app cruza el RUC/cédula de cada estética con las facturas
+          que Contifico ya sincroniza al dashboard y acredita el <b>10% exacto</b> de cada
+          compra ($105 → $10,50) — sin registro manual.
+        </div>
+      </div>`;
+  }
+
+  if(tabActual==='detalle' && window._adminCliente){
+    const c = CLIENTES.find(x=>x.id===window._adminCliente);
+    html = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <button class="btn-outline" style="padding:6px 12px" onclick="setTab('inicio')"><i class="ti ti-arrow-left"></i> Volver</button>
+        <div style="font-size:14px;font-weight:600">${c.nombre}</div>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-label">Compras</div><div class="kpi-val" style="font-size:14px">${fmt(totalCompras(c))}</div></div>
+        <div class="kpi"><div class="kpi-label">Generado</div><div class="kpi-val" style="font-size:14px">${fmt(saldoGenerado(c))}</div></div>
+        <div class="kpi"><div class="kpi-label">Disponible</div><div class="kpi-val" style="font-size:14px;color:var(--brown)">${fmt(saldoDisponible(c))}</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-receipt"></i> Facturas detectadas (Contifico)</div>
+        ${c.facturas.map(f=>`
+          <div class="mov">
+            <div class="mov-ico" style="background:var(--verde-bg);color:var(--verde)"><i class="ti ti-file-invoice"></i></div>
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:600">${f.doc}</div>
+              <div style="font-size:11px;color:var(--muted)">${fmtFecha(f.fecha)}</div>
+            </div>
+            <div style="font-size:13px;font-weight:600">${fmt(f.monto)}</div>
+          </div>`).join('')}
+        <div style="margin-top:10px;text-align:right">
+          <button class="btn-outline" onclick="simularFactura(${c.id})"><i class="ti ti-plus"></i> Simular nueva factura</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-gift"></i> Canjes</div>
+        ${c.canjes.length? c.canjes.map(x=>renderCanjeRow(x)).join('') : '<p style="font-size:12px;color:var(--muted)">Sin canjes todavía</p>'}
+      </div>`;
+  }
+
+  if(tabActual==='canjes'){
+    html = `
+      <div class="card">
+        <div class="card-title"><i class="ti ti-gift"></i> Solicitudes de canje pendientes</div>
+        ${canjesPend.length? canjesPend.map((x,i)=>`
+          <div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <div class="avatar" style="background:var(--brown);width:30px;height:30px;font-size:10px">${iniciales(x.cliente.nombre)}</div>
+              <div style="flex:1;font-size:13px;font-weight:600">${x.cliente.nombre}</div>
+              <span class="pill pill-amarillo">Pendiente</span>
+            </div>
+            ${x.items.map(it=>`<div style="font-size:12px;color:var(--muted);padding:2px 0">· ${it.qty}× ${it.nombre} <span style="float:right">${fmt(it.precio*it.qty)}</span></div>`).join('')}
+            <div style="font-size:12px;font-weight:700;text-align:right;margin-top:4px;color:var(--brown)">Total: ${fmt(x.total)}</div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button class="btn" style="flex:1;padding:8px" onclick="resolverCanje(${x.cliente.id},'${x.fecha}','aprobado')"><i class="ti ti-check"></i> Aprobar</button>
+              <button class="btn-outline" style="flex:1" onclick="resolverCanje(${x.cliente.id},'${x.fecha}','rechazado')">Rechazar</button>
+            </div>
+          </div>`).join('') : '<p style="font-size:12px;color:var(--muted)">No hay solicitudes pendientes 🎉</p>'}
+      </div>
+      <div class="card" style="background:var(--bl);border-color:rgba(160,104,74,0.25)">
+        <div style="font-size:12px;color:var(--brown-dark);line-height:1.5">
+          <i class="ti ti-truck-delivery" style="color:var(--brown)"></i>
+          Al <b>aprobar</b> un canje, los productos se agregan a la <b>próxima factura de la estética
+          con 100% de descuento</b> y se envían junto con su pedido.
+        </div>
+      </div>`;
+  }
+
+  if(tabActual==='nuevo'){
+    html = `
+      <div class="card">
+        <div class="card-title"><i class="ti ti-user-plus"></i> Crear cliente del plan</div>
+        <label class="lbl">Cédula o RUC *</label>
+        <input class="input" id="n-ruc" placeholder="Ej: 1791234567001" inputmode="numeric"/>
+        <label class="lbl">Nombre de la estética *</label>
+        <input class="input" id="n-nombre" placeholder="Ej: Estética Piel de Seda"/>
+        <label class="lbl">Persona de contacto (asesora)</label>
+        <input class="input" id="n-contacto" placeholder="Ej: Andrea Suárez"/>
+        <label class="lbl">Ciudad</label>
+        <input class="input" id="n-ciudad" placeholder="Ej: Cuenca"/>
+        <div style="margin-top:16px"><button class="btn" onclick="crearCliente()"><i class="ti ti-check"></i> Crear cliente</button></div>
+      </div>
+      <div class="card" style="background:var(--bl);border-color:rgba(160,104,74,0.25)">
+        <div style="font-size:12px;color:var(--brown-dark);line-height:1.5">
+          Con la cédula/RUC, la app empieza a <b>contar automáticamente</b> las compras de esta
+          estética desde Contifico y a generar su saldo. En este mock la creación es simulada.
+        </div>
+      </div>`;
+  }
+
+  if(tabActual==='catalogo'){
+    html = `
+      <div class="card">
+        <div class="card-title"><i class="ti ti-package"></i> Catálogo de canje (vista admin)</div>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:10px">El cliente solo ve los productos en <b style="color:var(--verde-txt)">inventario verde</b>. Los que pasan a amarillo/rojo se ocultan automáticamente del catálogo de canje.</p>
+        ${CATALOGO.map(p=>`
+          <div class="prod">
+            <div class="prod-img" style="background:${MARCA_COLORS[p.marca]||'#ccc'}"><i class="ti ti-bottle"></i></div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.nombre}</div>
+              <div style="font-size:10px;color:var(--muted)">${p.marca} · ${fmt(p.precio)}</div>
+            </div>
+            <span class="pill pill-${p.semaforo}">${p.semaforo==='verde'?'Visible':'Oculto'}</span>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  shell(html, tabs);
+}
+
+function verClienteAdmin(id){ window._adminCliente=id; tabActual='detalle'; render(); }
+
+function simularFactura(id){
+  const c = CLIENTES.find(x=>x.id===id);
+  const monto = Math.round((60+Math.random()*240)*100)/100;
+  const n = 1400+c.facturas.length*37+c.id;
+  c.facturas.push({doc:'001-002-'+n, fecha:'2026-07-24', monto});
+  toast('Factura simulada por '+fmt(monto)+' — saldo recalculado');
+  render();
+}
+
+function crearCliente(){
+  const ruc=document.getElementById('n-ruc').value.trim();
+  const nombre=document.getElementById('n-nombre').value.trim();
+  if(!ruc||!nombre){ toast('Completa cédula/RUC y nombre'); return; }
+  CLIENTES.push({
+    id: CLIENTES.length+1, ruc, nombre,
+    contacto: document.getElementById('n-contacto').value.trim()||'—',
+    ciudad: document.getElementById('n-ciudad').value.trim()||'—',
+    facturas:[], canjes:[]
+  });
+  toast('Cliente creado ✓ — empezará a acumular con sus compras');
+  tabActual='inicio'; render();
+}
+
+function resolverCanje(clienteId, fecha, estado){
+  const c = CLIENTES.find(x=>x.id===clienteId);
+  const canje = c.canjes.find(x=>x.fecha===fecha && x.estado==='pendiente');
+  if(canje){ canje.estado=estado; }
+  toast(estado==='aprobado' ? 'Canje aprobado — se agrega a la próxima factura con 100% dcto.' : 'Canje rechazado — el saldo vuelve al cliente');
+  render();
+}
+
+function renderCanjeRow(x){
+  const pills={pendiente:'pill-amarillo',aprobado:'pill-verde',entregado:'pill-verde',rechazado:'pill-rojo'};
+  const labels={pendiente:'Pendiente',aprobado:'Aprobado',entregado:'Entregado',rechazado:'Rechazado'};
+  return `<div class="mov">
+    <div class="mov-ico" style="background:var(--bl);color:var(--brown)"><i class="ti ti-gift"></i></div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12px;font-weight:600">${x.items.map(i=>i.qty+'× '+i.nombre).join(', ')}</div>
+      <div style="font-size:11px;color:var(--muted)">${fmtFecha(x.fecha)}</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:12px;font-weight:700">${fmt(x.total)}</div>
+      <span class="pill ${pills[x.estado]}">${labels[x.estado]}</span>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════ VISTA CLIENTE ═══════════════════
+function renderCliente(){
+  const c = CLIENTES.find(x=>x.id===sesion.id);
+  const tabs = [
+    {id:'inicio', icono:'wallet', label:'Mi saldo'},
+    {id:'catalogo', icono:'shopping-bag', label:'Catálogo', badge:carritoCount()||''},
+    {id:'canjes', icono:'gift', label:'Mis canjes'},
+  ];
+  let html='';
+
+  if(tabActual==='inicio'){
+    html = `
+      <div class="saldo-hero">
+        <div style="font-size:10px;letter-spacing:2px;color:#e8c9a8;text-transform:uppercase">Saldo disponible</div>
+        <div style="font-size:38px;font-weight:800;margin:4px 0">${fmt(saldoDisponible(c))}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.75)">Generado: ${fmt(saldoGenerado(c))} · Canjeado: ${fmt(saldoCanjeado(c))}</div>
+        <div style="margin-top:14px;position:relative;z-index:1;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.1);border-radius:10px;padding:8px 12px">
+          <i class="ti ti-sparkles" style="color:#e8c9a8;font-size:16px"></i>
+          <span style="font-size:11px;color:#e8c9a8">Compras acumuladas: <b style="color:#fff">${fmt(totalCompras(c))}</b> — el 10% de cada compra suma a tu saldo al instante</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-sparkles"></i> ¿Cómo funciona?</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6">
+          Cada compra de ${c.nombre} a COSÉTIKA te devuelve el <b style="color:var(--brown)">10%</b>
+          en saldo para canjear por productos (una compra de $105 te da <b style="color:var(--brown)">$10,50</b>).
+          Tus compras se registran automáticamente con cada factura — no tienes que hacer nada.
+          Al canjear, los productos llegan <b>gratis en tu próximo pedido</b>.
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-history"></i> Movimientos</div>
+        ${c.facturas.slice().reverse().map(f=>`
+          <div class="mov">
+            <div class="mov-ico" style="background:var(--verde-bg);color:var(--verde)"><i class="ti ti-arrow-down-left"></i></div>
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:600">Compra ${f.doc}</div>
+              <div style="font-size:11px;color:var(--muted)">${fmtFecha(f.fecha)} · ${fmt(f.monto)}</div>
+            </div>
+            <div style="font-size:12px;font-weight:700;color:var(--verde-txt)">+${fmt(f.monto*REGLA_PCT)}</div>
+          </div>`).join('')}
+        ${c.canjes.filter(x=>x.estado!=='rechazado').map(x=>`
+          <div class="mov">
+            <div class="mov-ico" style="background:var(--bl);color:var(--brown)"><i class="ti ti-gift"></i></div>
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:600">Canje de productos</div>
+              <div style="font-size:11px;color:var(--muted)">${fmtFecha(x.fecha)}</div>
+            </div>
+            <div style="font-size:12px;font-weight:700;color:var(--rojo)">−${fmt(x.total)}</div>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  if(tabActual==='catalogo'){
+    const visibles = CATALOGO.filter(p=>p.semaforo==='verde');
+    const total = carritoTotal();
+    const saldo = saldoDisponible(c);
+    const excede = total>saldo;
+    html = `
+      <div class="card" style="display:flex;align-items:center;gap:10px;padding:12px 16px">
+        <i class="ti ti-wallet" style="font-size:20px;color:var(--brown)"></i>
+        <div style="flex:1;font-size:12px;color:var(--muted)">Tu saldo disponible</div>
+        <div style="font-size:16px;font-weight:800;color:var(--brown)">${fmt(saldo)}</div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-shopping-bag"></i> Productos disponibles para canje</div>
+        <p style="font-size:10px;color:var(--muted);margin-bottom:8px"><i class="ti ti-circle-filled" style="color:var(--verde);font-size:8px"></i> Solo se muestran productos con stock disponible</p>
+        ${visibles.map(p=>{
+          const q = carrito[p.id]||0;
+          return `<div class="prod">
+            <div class="prod-img" style="background:${MARCA_COLORS[p.marca]||'#ccc'}"><i class="ti ti-bottle"></i></div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.nombre}">${p.nombre}</div>
+              <div style="font-size:10px;color:var(--muted)">${p.marca}</div>
+              <div style="font-size:13px;font-weight:700;color:var(--brown)">${fmt(p.precio)}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              ${q>0?`<button class="qty-btn" onclick="cambiarQty(${p.id},-1)">−</button><span style="font-size:13px;font-weight:700;min-width:16px;text-align:center">${q}</span>`:''}
+              <button class="qty-btn" style="background:var(--brown);color:#fff;border-color:var(--brown)" onclick="cambiarQty(${p.id},1)">+</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      ${carritoCount()>0?`
+      <div class="card" style="border:1.5px solid var(--brown)">
+        <div class="card-title"><i class="ti ti-shopping-cart"></i> Tu canje</div>
+        ${Object.entries(carrito).map(([id,q])=>{ const p=CATALOGO.find(x=>x.id==id); return `<div style="font-size:12px;padding:3px 0;color:var(--muted)">${q}× ${p.nombre} <span style="float:right;font-weight:600;color:var(--text)">${fmt(p.precio*q)}</span></div>`; }).join('')}
+        <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;font-size:14px;font-weight:800">
+          <span>Total</span><span style="color:${excede?'var(--rojo)':'var(--brown)'}">${fmt(total)}</span>
+        </div>
+        ${excede?`<div style="font-size:11px;color:var(--rojo);background:var(--rojo-bg);border-radius:8px;padding:8px 10px;margin-top:8px"><i class="ti ti-alert-circle"></i> Te faltan ${fmt(total-saldo)} de saldo. Quita productos o sigue acumulando con tus compras.</div>`:''}
+        <div style="margin-top:12px"><button class="btn" ${excede?'disabled':''} onclick="solicitarCanje()"><i class="ti ti-gift"></i> Canjear — llega gratis en tu próximo pedido</button></div>
+      </div>`:''}`;
+  }
+
+  if(tabActual==='canjes'){
+    html = `
+      <div class="card">
+        <div class="card-title"><i class="ti ti-gift"></i> Mis canjes</div>
+        ${c.canjes.length? c.canjes.slice().reverse().map(x=>renderCanjeRow(x)).join('') : '<p style="font-size:12px;color:var(--muted)">Aún no has canjeado. Ve al catálogo y elige tus productos 💛</p>'}
+      </div>
+      <div class="card" style="background:var(--bl);border-color:rgba(160,104,74,0.25)">
+        <div style="font-size:12px;color:var(--brown-dark);line-height:1.5">
+          <i class="ti ti-truck-delivery" style="color:var(--brown)"></i>
+          Cuando COSÉTIKA aprueba tu canje, los productos se incluyen en tu
+          <b>próxima factura con 100% de descuento</b> y llegan junto con tu pedido.
+        </div>
+      </div>`;
+  }
+
+  shell(html, tabs);
+}
+
+function cambiarQty(id, delta){
+  carrito[id] = (carrito[id]||0)+delta;
+  if(carrito[id]<=0) delete carrito[id];
+  render();
+}
+
+function solicitarCanje(){
+  const c = CLIENTES.find(x=>x.id===sesion.id);
+  const items = Object.entries(carrito).map(([id,q])=>{ const p=CATALOGO.find(x=>x.id==id); return {nombre:p.nombre, precio:p.precio, qty:q}; });
+  const total = Math.round(carritoTotal()*100)/100;
+  if(total > saldoDisponible(c)){ toast('Saldo insuficiente'); return; }
+  c.canjes.push({fecha:'2026-07-24', items, total, estado:'pendiente'});
+  carrito = {};
+  tabActual = 'canjes';
+  toast('Solicitud enviada ✓ COSÉTIKA la aprobará y llegará en tu próximo pedido');
+  render();
+}
+
+// ═══════════════════ INICIO ═══════════════════
+renderLogin();
+</script>
+</body>
+</html>

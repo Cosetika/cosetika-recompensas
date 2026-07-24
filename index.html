@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>COSÉTIKA — Plan de Recompensas</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2232%22%20fill%3D%22%23A0684A%22/%3E%3Ctext%20x%3D%2232%22%20y%3D%2244%22%20font-family%3D%22Georgia%2C%20serif%22%20font-style%3D%22italic%22%20font-weight%3D%22700%22%20font-size%3D%2234%22%20fill%3D%22%23ffffff%22%20text-anchor%3D%22middle%22%3EC%3C/text%3E%3C/svg%3E"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--brown:#A0684A;--brown-dark:#1a0e08;--bl:rgba(160,104,74,0.12);--bg:#f4f1ee;--card:#fff;--text:#1a1a1a;--muted:#6b6b6b;--border:rgba(0,0,0,0.08);--verde:#1D9E75;--verde-bg:#E1F5EE;--verde-txt:#085041;--rojo:#991b1b;--rojo-bg:#fee2e2}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.header{background:var(--brown-dark);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--brown);position:sticky;top:0;z-index:50}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-c{width:38px;height:38px;background:var(--brown);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;font-style:italic;font-family:Georgia,serif;flex-shrink:0}
+.logo-name{font-size:15px;font-weight:500;letter-spacing:2px;color:#fff}
+.logo-sl{font-size:9px;color:#e8c9a8;letter-spacing:1px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.icon-btn{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px}
+.container{max-width:560px;margin:0 auto;padding:14px 14px 90px}
+.card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px}
+.card-title{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;gap:5px}
+.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px}
+.kpi-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.kpi-val{font-size:16px;font-weight:700;color:var(--text);margin-top:2px}
+.tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);display:grid;z-index:50;max-width:560px;margin:0 auto;box-shadow:0 -4px 16px rgba(0,0,0,0.05)}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px;cursor:pointer;color:var(--muted);font-size:10px;font-weight:500;border-top:3px solid transparent}
+.tab.active{color:var(--brown);border-top-color:var(--brown)}
+.tab i{font-size:20px}
+.btn{background:var(--brown);color:#fff;border:none;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;width:100%}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+.btn-outline{background:#fff;color:var(--brown);border:1.5px solid var(--brown);padding:9px 16px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer}
+.input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;outline:none;background:#fff}
+.input:focus{border-color:var(--brown)}
+.lbl{font-size:11px;color:var(--muted);margin:10px 0 4px;display:block;font-weight:500}
+.pill{font-size:10px;padding:3px 10px;border-radius:20px;font-weight:600;white-space:nowrap}
+.pill-verde{background:var(--verde-bg);color:var(--verde-txt)}
+.pill-amarillo{background:#FAEEDA;color:#633806}
+.pill-rojo{background:var(--rojo-bg);color:var(--rojo)}
+.mov{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.mov:last-child{border-bottom:none}
+.mov-ico{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.saldo-hero{background:linear-gradient(135deg,var(--brown-dark),#3d2418);border-radius:16px;padding:22px 18px;color:#fff;margin-bottom:12px;position:relative;overflow:hidden}
+.saldo-hero::after{content:'';position:absolute;right:-30px;top:-30px;width:140px;height:140px;border-radius:50%;background:rgba(160,104,74,0.25)}
+.prod{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.prod:last-child{border-bottom:none}
+.prod-img{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;color:#fff}
+.qty-btn{width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;color:var(--brown);font-weight:700}
+.fadein{animation:fadeIn 0.25s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:50px;gap:10px;color:var(--muted);font-size:12px}
+.loader i{font-size:30px;color:var(--brown);animation:spin 1s linear infinite}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--brown-dark);color:#fff;padding:10px 18px;border-radius:24px;font-size:12px;z-index:200;display:none;box-shadow:0 6px 20px rgba(0,0,0,0.25);max-width:90%;text-align:center}
+.login-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:linear-gradient(160deg,var(--brown-dark) 0%,#2c1810 55%,#3d2418 100%)}
+.login-card{background:#fff;border-radius:18px;padding:26px 22px;width:100%;max-width:380px;box-shadow:0 20px 50px rgba(0,0,0,0.35)}
+.avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0}
+.buscador{position:relative;margin-bottom:10px}
+.buscador i{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px}
+.buscador input{padding-left:32px}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════ ESTADO ═══════════════════
+let sesion = JSON.parse(sessionStorage.getItem('recompensas_sesion') || 'null');
+let tabActual = 'inicio';
+let carrito = {};          // {productoId: qty}
+let CATALOGO = [];         // productos verdes (cliente) o todos (admin)
+let RESUMEN = null;        // resumen del cliente logueado
+let CLIENTES = [];         // admin
+let CANJES_PEND = [];      // admin
+let filtroCat = '';
+
+const MARCA_COLORS = { 'ZIAJA':'#6ee7b7', 'BIOSKIN':'#a5b4fc', 'ERAYBA':'#fcd34d', 'ZIAJA PRO':'#f9a8d4' };
+
+function fmt(n){ return '$'+Number(n||0).toLocaleString('es-EC',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtFecha(f){ if(!f) return '—'; const [y,m,d]=f.split('-'); return d+'/'+m+'/'+y; }
+function iniciales(n){ return (n||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase(); }
+function carritoTotal(){ return Object.entries(carrito).reduce((a,[id,q])=>{ const p=CATALOGO.find(x=>x.id==id); return a+(p?p.precio*q:0); },0); }
+function carritoCount(){ return Object.values(carrito).reduce((a,q)=>a+q,0); }
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.display='block';
+  clearTimeout(window._toastT);
+  window._toastT=setTimeout(()=>{ t.style.display='none'; },3200);
+}
+async function api(url, opts){
+  const r = await fetch(url, opts);
+  const data = await r.json().catch(()=>({ok:false,error:'Respuesta inválida del servidor'}));
+  if(!r.ok && data.error) throw new Error(data.error);
+  return data;
+}
+
+// ═══════════════════ LOGIN ═══════════════════
+function renderLogin(){
+  document.getElementById('app').innerHTML = `
+  <div class="login-wrap">
+    <div style="text-align:center;margin-bottom:22px">
+      <div style="width:64px;height:64px;background:var(--brown);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;color:#fff;font-style:italic;font-family:Georgia,serif">C</div>
+      <div style="font-size:19px;letter-spacing:3px;color:#fff;margin-top:10px;font-weight:500">COSÉTIKA</div>
+      <div style="font-size:11px;color:#e8c9a8;letter-spacing:1px;margin-top:2px">Plan de Recompensas</div>
+    </div>
+    <div class="login-card">
+      <label class="lbl">Usuario</label>
+      <input class="input" id="l-usuario" autocomplete="username" placeholder="Tu usuario"/>
+      <label class="lbl">Contraseña</label>
+      <input class="input" id="l-password" type="password" autocomplete="current-password" placeholder="••••••" onkeydown="if(event.key==='Enter')login()"/>
+      <div style="margin-top:16px"><button class="btn" id="l-btn" onclick="login()"><i class="ti ti-login"></i> Entrar</button></div>
+      <div id="l-error" style="font-size:12px;color:var(--rojo);margin-top:10px;text-align:center"></div>
+    </div>
+  </div>`;
+}
+
+async function login(){
+  const usuario = document.getElementById('l-usuario').value.trim();
+  const password = document.getElementById('l-password').value;
+  const btn = document.getElementById('l-btn');
+  const err = document.getElementById('l-error');
+  if(!usuario || !password){ err.textContent='Ingresa usuario y contraseña'; return; }
+  btn.disabled = true; btn.innerHTML = 'Verificando...'; err.textContent='';
+  try{
+    const data = await api('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({usuario, password}) });
+    sesion = data;
+    sessionStorage.setItem('recompensas_sesion', JSON.stringify(sesion));
+    tabActual = 'inicio'; carrito = {};
+    render();
+  }catch(e){
+    err.textContent = e.message || 'Usuario o contraseña incorrectos';
+    btn.disabled = false; btn.innerHTML = '<i class="ti ti-login"></i> Entrar';
+  }
+}
+function logout(){ sesion=null; sessionStorage.removeItem('recompensas_sesion'); renderLogin(); }
+
+// ═══════════════════ LAYOUT ═══════════════════
+function shell(contenido, tabs){
+  const quien = sesion.tipo==='admin' ? (sesion.nombre||'Administrador') : sesion.nombre;
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <div class="logo">
+        <div class="logo-c">C</div>
+        <div>
+          <div class="logo-name">COSÉTIKA</div>
+          <div class="logo-sl">Recompensas · ${quien}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="icon-btn" title="Actualizar" onclick="render()"><i class="ti ti-refresh"></i></div>
+        <div class="icon-btn" title="Cerrar sesión" onclick="if(confirm('¿Cerrar sesión?'))logout()"><i class="ti ti-logout"></i></div>
+      </div>
+    </div>
+    <div class="container fadein" id="contenido">${contenido}</div>
+    <div class="tabs" style="grid-template-columns:repeat(${tabs.length},1fr)">
+      ${tabs.map(t=>`
+        <div class="tab ${tabActual===t.id?'active':''}" onclick="setTab('${t.id}')">
+          <i class="ti ti-${t.icono}"></i>${t.label}
+          ${t.badge?`<span style="position:absolute;margin-left:34px;margin-top:-4px;background:var(--rojo);color:#fff;font-size:9px;min-width:15px;height:15px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;padding:0 3px">${t.badge}</span>`:''}
+        </div>`).join('')}
+    </div>`;
+}
+function shellLoader(tabs){ shell('<div class="loader"><i class="ti ti-loader"></i><span>Cargando...</span></div>', tabs); }
+function setTab(t){ tabActual=t; render(); }
+function render(){
+  if(!sesion){ renderLogin(); return; }
+  if(sesion.tipo==='admin') renderAdmin();
+  else renderCliente();
+}
+
+// ═══════════════════ ADMIN ═══════════════════
+function tabsAdmin(){
+  return [
+    {id:'inicio', icono:'users', label:'Clientes'},
+    {id:'canjes', icono:'gift', label:'Canjes', badge:CANJES_PEND.length||''},
+    {id:'nuevo', icono:'user-plus', label:'Nuevo'},
+    {id:'catalogo', icono:'package', label:'Catálogo'},
+  ];
+}
+
+async function renderAdmin(){
+  shellLoader(tabsAdmin());
+  try{
+    if(tabActual==='inicio' || tabActual==='canjes' || tabActual==='nuevo'){
+      [CLIENTES, CANJES_PEND] = await Promise.all([
+        api('/api/admin/clientes'),
+        api('/api/admin/canjes?estado=pendiente')
+      ]);
+    }
+    let html='';
+
+    if(tabActual==='inicio'){
+      const saldoTotal = CLIENTES.reduce((a,c)=>a+c.saldo,0);
+      const comprasTotal = CLIENTES.reduce((a,c)=>a+c.compras,0);
+      html = `
+        <div class="kpi-row">
+          <div class="kpi"><div class="kpi-label">Clientes</div><div class="kpi-val">${CLIENTES.length}</div></div>
+          <div class="kpi"><div class="kpi-label">Compras acum.</div><div class="kpi-val" style="font-size:13px">${fmt(comprasTotal)}</div></div>
+          <div class="kpi"><div class="kpi-label">Saldo por canjear</div><div class="kpi-val" style="font-size:13px;color:var(--brown)">${fmt(saldoTotal)}</div></div>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div class="card-title" style="margin-bottom:0"><i class="ti ti-users"></i> Estéticas en el plan</div>
+            <button class="btn-outline" style="padding:5px 10px;font-size:11px" onclick="forzarSync()"><i class="ti ti-refresh"></i> Sync compras</button>
+          </div>
+          ${CLIENTES.length ? CLIENTES.map(c=>`
+            <div class="mov" style="cursor:pointer;${!c.activo?'opacity:0.45':''}" onclick="verClienteAdmin(${c.id})">
+              <div class="avatar" style="background:var(--brown);width:38px;height:38px;font-size:12px">${iniciales(c.nombre)}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.nombre} ${!c.activo?'<span class="pill pill-rojo">inactivo</span>':''}</div>
+                <div style="font-size:11px;color:var(--muted)">RUC ${c.ruc} · ${c.num_facturas} fact. · compras ${fmt(c.compras)} · desde ${fmtFecha(c.desde)}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:14px;font-weight:700;color:var(--brown)">${fmt(c.saldo)}</div>
+                <div style="font-size:9px;color:var(--muted)">saldo</div>
+              </div>
+            </div>`).join('') : '<p style="font-size:12px;color:var(--muted)">Aún no has creado clientes. Ve a la pestaña "Nuevo".</p>'}
+        </div>
+        <div class="card" style="background:var(--bl);border-color:rgba(160,104,74,0.25)">
+          <div style="font-size:12px;color:var(--brown-dark);line-height:1.5">
+            <i class="ti ti-refresh" style="color:var(--brown)"></i>
+            La app revisa Contifico cada 30 minutos y acredita el <b>10% del subtotal sin IVA</b>
+            de cada factura al RUC de cada estética. Sin registro manual.
+          </div>
+        </div>`;
+    }
+
+    if(tabActual==='detalle' && window._adminCliente){
+      const d = await api('/api/admin/clientes/'+window._adminCliente+'/resumen');
+      html = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <button class="btn-outline" style="padding:6px 12px" onclick="setTab('inicio')"><i class="ti ti-arrow-left"></i> Volver</button>
+          <div style="font-size:14px;font-weight:600;flex:1">${d.cliente.nombre}</div>
+        </div>
+        <div class="kpi-row">
+          <div class="kpi"><div class="kpi-label">Compras</div><div class="kpi-val" style="font-size:13px">${fmt(d.compras_total)}</div></div>
+          <div class="kpi"><div class="kpi-label">Generado</div><div class="kpi-val" style="font-size:13px">${fmt(d.saldo_generado)}</div></div>
+          <div class="kpi"><div class="kpi-label">Disponible</div><div class="kpi-val" style="font-size:13px;color:var(--brown)">${fmt(d.saldo_disponible)}</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><i class="ti ti-id"></i> Datos</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.8">
+            RUC/Cédula: <b style="color:var(--text)">${d.cliente.ruc}</b><br>
+            Contacto: <b style="color:var(--text)">${d.cliente.contacto||'—'}</b> · Ciudad: <b style="color:var(--text)">${d.cliente.ciudad||'—'}</b><br>
+            Usuario de acceso: <b style="color:var(--text)">${d.cliente.usuario}</b> · Compras cuentan desde: <b style="color:var(--text)">${fmtFecha(d.cliente.desde)}</b>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn-outline" style="flex:1" onclick="cambiarPasswordCliente(${d.cliente.id})"><i class="ti ti-key"></i> Cambiar clave</button>
+            <button class="btn-outline" style="flex:1" onclick="toggleActivoCliente(${d.cliente.id}, ${d.cliente.activo})">${d.cliente.activo?'<i class="ti ti-user-off"></i> Desactivar':'<i class="ti ti-user-check"></i> Activar'}</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><i class="ti ti-receipt"></i> Facturas acreditadas (Contifico)</div>
+          ${d.compras.length ? d.compras.map(f=>`
+            <div class="mov">
+              <div class="mov-ico" style="background:var(--verde-bg);color:var(--verde)"><i class="ti ti-file-invoice"></i></div>
+              <div style="flex:1">
+                <div style="font-size:12px;font-weight:600">${f.documento||'—'}</div>
+                <div style="font-size:11px;color:var(--muted)">${fmtFecha(f.fecha)} · subtotal ${fmt(f.subtotal)}</div>
+              </div>
+              <div style="font-size:13px;font-weight:700;color:var(--verde-txt)">+${fmt(f.recompensa)}</div>
+            </div>`).join('') : '<p style="font-size:12px;color:var(--muted)">Sin facturas todavía — se acreditan automáticamente cuando la estética compre.</p>'}
+        </div>
+        <div class="card">
+          <div class="card-title"><i class="ti ti-gift"></i> Canjes</div>
+          ${d.canjes.length ? d.canjes.map(x=>renderCanjeRow(x)).join('') : '<p style="font-size:12px;color:var(--muted)">Sin canjes todavía</p>'}
+        </div>`;
+    }
+
+    if(tabActual==='canjes'){
+      html = `
+        <div class="card">
+          <div class="card-title"><i class="ti ti-gift"></i> Solicitudes pendientes</div>
+          ${CANJES_PEND.length ? CANJES_PEND.map(x=>`
+            <div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <div class="avatar" style="background:var(--brown);width:30px;height:30px;font-size:10px">${iniciales(x.cliente_nombre)}</div>
+                <div style="flex:1;font-size:13px;font-weight:600">${x.cliente_nombre}</div>
+                <span class="pill pill-amarillo">${fmtFecha(x.fecha)}</span>
+              </div>
+              ${x.items.map(it=>`<div style="font-size:12px;color:var(--muted);padding:2px 0">· ${it.qty}× ${it.nombre} <span style="float:right">${fmt(it.precio*it.qty)}</span></div>`).join('')}
+              <div style="font-size:12px;font-weight:700;text-align:right;margin-top:4px;color:var(--brown)">Total: ${fmt(x.total)}</div>
+              <div style="display:flex;gap:8px;margin-top:10px">
+                <button class="btn" style="flex:1;padding:8px" onclick="resolverCanje(${x.id},'aprobado')"><i class="ti ti-check"></i> Aprobar</button>
+                <button class="btn-outline" style="flex:1" onclick="resolverCanje(${x.id},'rechazado')">Rechazar</button>
+              </div>
+            </div>`).join('') : '<p style="font-size:12px;color:var(--muted)">No hay solicitudes pendientes 🎉</p>'}
+        </div>
+        <div class="card" style="background:var(--bl);border-color:rgba(160,104,74,0.25)">
+          <div style="font-size:12px;color:var(--brown-dark);line-height:1.5">
+            <i class="ti ti-truck-delivery" style="color:var(--brown)"></i>
+            Al <b>aprobar</b>, agrega los productos en la <b>próxima factura de la estética con
+            100% de descuento</b> en Contifico y envíalos con su pedido. Cuando salga el envío,
+            márcalo como "Entregado" desde el detalle del cliente.
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><i class="ti ti-history"></i> Aprobados por entregar</div>
+          <div id="canjes-aprobados"><div class="loader" style="padding:14px"><i class="ti ti-loader"></i></div></div>
+        </div>`;
+    }
+
+    if(tabActual==='nuevo'){
+      html = `
+        <div class="card">
+          <div class="card-title"><i class="ti ti-user-plus"></i> Crear cliente del plan</div>
+          <label class="lbl">Cédula o RUC *</label>
+          <input class="input" id="n-ruc" placeholder="Ej: 1791234567001" inputmode="numeric"/>
+          <label class="lbl">Nombre de la estética *</label>
+          <input class="input" id="n-nombre" placeholder="Ej: Estética Piel de Seda"/>
+          <label class="lbl">Persona de contacto</label>
+          <input class="input" id="n-contacto" placeholder="Ej: Andrea Suárez"/>
+          <label class="lbl">Ciudad</label>
+          <input class="input" id="n-ciudad" placeholder="Ej: Cuenca"/>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div><label class="lbl">Usuario de acceso *</label><input class="input" id="n-usuario" placeholder="Ej: pieldeseda"/></div>
+            <div><label class="lbl">Contraseña *</label><input class="input" id="n-password" placeholder="••••"/></div>
+          </div>
+          <label class="lbl">Las compras cuentan desde</label>
+          <input class="input" id="n-desde" type="date"/>
+          <div style="margin-top:16px"><button class="btn" id="n-btn" onclick="crearCliente()"><i class="ti ti-check"></i> Crear cliente</button></div>
+        </div>
+        <div class="card" style="background:var(--bl);border-color:rgba(160,104,74,0.25)">
+          <div style="font-size:12px;color:var(--brown-dark);line-height:1.5">
+            Con la cédula/RUC la app cruza automáticamente las facturas de Contifico y genera el
+            saldo (10% del subtotal sin IVA). Si eliges una fecha pasada, trae las compras
+            retroactivas desde ese día.
+          </div>
+        </div>`;
+    }
+
+    if(tabActual==='catalogo'){
+      const data = await api('/api/catalogo?todos=1');
+      CATALOGO = data.productos;
+      const verdes = CATALOGO.filter(p=>p.semaforo==='verde').length;
+      const sinPrecio = CATALOGO.filter(p=>p.semaforo==='verde' && !(p.precio>0)).length;
+      const q = filtroCat.toLowerCase();
+      const lista = CATALOGO.filter(p=>!q || p.nombre.toLowerCase().includes(q) || p.marca.toLowerCase().includes(q));
+      html = `
+        <div class="card">
+          <div class="card-title"><i class="ti ti-package"></i> Catálogo de canje (vista admin)</div>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:8px">
+            Corte de inventario: <b>${data.fecha_corte?fmtFecha(data.fecha_corte):'sin subir'}</b> ·
+            ${verdes} en verde (visibles para clientes)${sinPrecio?` · <span style="color:var(--rojo)">${sinPrecio} en verde SIN precio (ocultos — revisar PVP en Contifico)</span>`:''}
+          </p>
+          <div class="buscador"><i class="ti ti-search"></i><input class="input" placeholder="Buscar producto o marca..." value="${filtroCat}" oninput="filtroCat=this.value;render()"/></div>
+          ${lista.slice(0,150).map(p=>`
+            <div class="prod">
+              <div class="prod-img" style="background:${MARCA_COLORS[p.marca]||'#ccc'}"><i class="ti ti-bottle"></i></div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.nombre}">${p.nombre}</div>
+                <div style="font-size:10px;color:var(--muted)">${p.marca} · ${p.precio>0?fmt(p.precio):'<span style="color:var(--rojo)">sin precio</span>'} · stock ${p.stock}</div>
+              </div>
+              <span class="pill pill-${p.semaforo}">${p.semaforo==='verde'?'Visible':'Oculto'}</span>
+            </div>`).join('')}
+          ${lista.length>150?`<p style="font-size:11px;color:var(--muted);margin-top:8px">Mostrando 150 de ${lista.length} — usa el buscador</p>`:''}
+        </div>`;
+    }
+
+    shell(html, tabsAdmin());
+    if(tabActual==='canjes') cargarCanjesAprobados();
+  }catch(e){
+    shell(`<div class="card"><p style="font-size:13px;color:var(--rojo)"><i class="ti ti-alert-circle"></i> ${e.message}</p></div>`, tabsAdmin());
+  }
+}
+
+async function cargarCanjesAprobados(){
+  try{
+    const aprobados = await api('/api/admin/canjes?estado=aprobado');
+    const cont = document.getElementById('canjes-aprobados');
+    if(!cont) return;
+    cont.innerHTML = aprobados.length ? aprobados.map(x=>`
+      <div class="mov">
+        <div class="mov-ico" style="background:var(--bl);color:var(--brown)"><i class="ti ti-gift"></i></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600">${x.cliente_nombre}</div>
+          <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.items.map(i=>i.qty+'× '+i.nombre).join(', ')}</div>
+        </div>
+        <button class="btn-outline" style="padding:5px 10px;font-size:11px" onclick="resolverCanje(${x.id},'entregado')"><i class="ti ti-truck"></i> Entregado</button>
+      </div>`).join('') : '<p style="font-size:12px;color:var(--muted)">Nada pendiente de entrega</p>';
+  }catch(e){ /* silencioso */ }
+}
+
+function verClienteAdmin(id){ window._adminCliente=id; tabActual='detalle'; render(); }
+
+async function crearCliente(){
+  const btn = document.getElementById('n-btn');
+  const body = {
+    ruc: document.getElementById('n-ruc').value.trim(),
+    nombre: document.getElementById('n-nombre').value.trim(),
+    contacto: document.getElementById('n-contacto').value.trim(),
+    ciudad: document.getElementById('n-ciudad').value.trim(),
+    usuario: document.getElementById('n-usuario').value.trim(),
+    password: document.getElementById('n-password').value,
+    desde: document.getElementById('n-desde').value || null
+  };
+  if(!body.ruc||!body.nombre||!body.usuario||!body.password){ toast('Completa RUC, nombre, usuario y contraseña'); return; }
+  btn.disabled = true;
+  try{
+    await api('/api/admin/clientes', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    toast('Cliente creado ✓ — sus compras ya empiezan a acumular');
+    tabActual='inicio'; render();
+  }catch(e){ toast(e.message); btn.disabled = false; }
+}
+
+async function resolverCanje(id, estado){
+  if(estado==='rechazado' && !confirm('¿Rechazar este canje? El saldo vuelve al cliente.')) return;
+  try{
+    await api('/api/admin/canjes/'+id+'/resolver', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({estado}) });
+    toast(estado==='aprobado' ? 'Aprobado — agrégalo a su próxima factura con 100% dcto.' : estado==='entregado' ? 'Marcado como entregado ✓' : 'Canje rechazado — saldo devuelto');
+    render();
+  }catch(e){ toast(e.message); }
+}
+
+async function cambiarPasswordCliente(id){
+  const p = prompt('Nueva contraseña para este cliente:');
+  if(!p) return;
+  try{ await api('/api/admin/clientes/'+id, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password:p}) }); toast('Contraseña actualizada ✓'); }
+  catch(e){ toast(e.message); }
+}
+async function toggleActivoCliente(id, activo){
+  try{ await api('/api/admin/clientes/'+id, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({activo:!activo}) }); render(); }
+  catch(e){ toast(e.message); }
+}
+async function forzarSync(){
+  toast('Sincronizando con Contifico...');
+  try{
+    const r = await api('/api/admin/sync?dias=7');
+    toast(r.ok ? `Sync ✓ — ${r.nuevos} facturas nuevas acreditadas` : (r.error||'Error en sync'));
+    render();
+  }catch(e){ toast(e.message); }
+}
+
+function renderCanjeRow(x){
+  const pills={pendiente:'pill-amarillo',aprobado:'pill-verde',entregado:'pill-verde',rechazado:'pill-rojo'};
+  const labels={pendiente:'Pendiente',aprobado:'Aprobado',entregado:'Entregado',rechazado:'Rechazado'};
+  return `<div class="mov">
+    <div class="mov-ico" style="background:var(--bl);color:var(--brown)"><i class="ti ti-gift"></i></div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.items.map(i=>i.qty+'× '+i.nombre).join(', ')}</div>
+      <div style="font-size:11px;color:var(--muted)">${fmtFecha(x.fecha)}</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:12px;font-weight:700">${fmt(x.total)}</div>
+      <span class="pill ${pills[x.estado]||'pill-amarillo'}">${labels[x.estado]||x.estado}</span>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════ CLIENTE ═══════════════════
+function tabsCliente(){
+  return [
+    {id:'inicio', icono:'wallet', label:'Mi saldo'},
+    {id:'catalogo', icono:'shopping-bag', label:'Catálogo', badge:carritoCount()||''},
+    {id:'canjes', icono:'gift', label:'Mis canjes'},
+  ];
+}
+
+async function renderCliente(){
+  shellLoader(tabsCliente());
+  try{
+    RESUMEN = await api('/api/cliente/'+sesion.cliente_id+'/resumen');
+    let html='';
+
+    if(tabActual==='inicio'){
+      html = `
+        <div class="saldo-hero">
+          <div style="font-size:10px;letter-spacing:2px;color:#e8c9a8;text-transform:uppercase">Saldo disponible</div>
+          <div style="font-size:38px;font-weight:800;margin:4px 0">${fmt(RESUMEN.saldo_disponible)}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.75)">Generado: ${fmt(RESUMEN.saldo_generado)} · Canjeado: ${fmt(RESUMEN.saldo_canjeado)}</div>
+          <div style="margin-top:14px;position:relative;z-index:1;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.1);border-radius:10px;padding:8px 12px">
+            <i class="ti ti-sparkles" style="color:#e8c9a8;font-size:16px"></i>
+            <span style="font-size:11px;color:#e8c9a8">Compras acumuladas: <b style="color:#fff">${fmt(RESUMEN.compras_total)}</b> — el 10% de cada compra suma a tu saldo</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><i class="ti ti-sparkles"></i> ¿Cómo funciona?</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6">
+            Cada compra tuya a COSÉTIKA te devuelve el <b style="color:var(--brown)">10%</b> del
+            subtotal en saldo para canjear por productos. Se acredita automáticamente con cada
+            factura — no tienes que hacer nada. Al canjear, los productos llegan
+            <b>gratis en tu próximo pedido</b>.
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><i class="ti ti-history"></i> Movimientos</div>
+          ${(!RESUMEN.compras.length && !RESUMEN.canjes.length) ? '<p style="font-size:12px;color:var(--muted)">Todavía no hay movimientos — con tu próxima compra empieza a sumar 💛</p>':''}
+          ${RESUMEN.compras.map(f=>`
+            <div class="mov">
+              <div class="mov-ico" style="background:var(--verde-bg);color:var(--verde)"><i class="ti ti-arrow-down-left"></i></div>
+              <div style="flex:1">
+                <div style="font-size:12px;font-weight:600">Compra ${f.documento||''}</div>
+                <div style="font-size:11px;color:var(--muted)">${fmtFecha(f.fecha)} · subtotal ${fmt(f.subtotal)}</div>
+              </div>
+              <div style="font-size:12px;font-weight:700;color:var(--verde-txt)">+${fmt(f.recompensa)}</div>
+            </div>`).join('')}
+          ${RESUMEN.canjes.filter(x=>x.estado!=='rechazado').map(x=>`
+            <div class="mov">
+              <div class="mov-ico" style="background:var(--bl);color:var(--brown)"><i class="ti ti-gift"></i></div>
+              <div style="flex:1">
+                <div style="font-size:12px;font-weight:600">Canje de productos</div>
+                <div style="font-size:11px;color:var(--muted)">${fmtFecha(x.fecha)}</div>
+              </div>
+              <div style="font-size:12px;font-weight:700;color:var(--rojo)">−${fmt(x.total)}</div>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    if(tabActual==='catalogo'){
+      const data = await api('/api/catalogo');
+      CATALOGO = data.productos;
+      const total = Math.round(carritoTotal()*100)/100;
+      const saldo = RESUMEN.saldo_disponible;
+      const excede = total > saldo;
+      const q = filtroCat.toLowerCase();
+      const lista = CATALOGO.filter(p=>!q || p.nombre.toLowerCase().includes(q) || p.marca.toLowerCase().includes(q));
+      html = `
+        <div class="card" style="display:flex;align-items:center;gap:10px;padding:12px 16px">
+          <i class="ti ti-wallet" style="font-size:20px;color:var(--brown)"></i>
+          <div style="flex:1;font-size:12px;color:var(--muted)">Tu saldo disponible</div>
+          <div style="font-size:16px;font-weight:800;color:var(--brown)">${fmt(saldo)}</div>
+        </div>
+        ${carritoCount()>0?`
+        <div class="card" style="border:1.5px solid var(--brown)">
+          <div class="card-title"><i class="ti ti-shopping-cart"></i> Tu canje</div>
+          ${Object.entries(carrito).map(([id,qq])=>{ const p=CATALOGO.find(x=>x.id==id); return p?`<div style="font-size:12px;padding:3px 0;color:var(--muted)">${qq}× ${p.nombre} <span style="float:right;font-weight:600;color:var(--text)">${fmt(p.precio*qq)}</span></div>`:''; }).join('')}
+          <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;font-size:14px;font-weight:800">
+            <span>Total</span><span style="color:${excede?'var(--rojo)':'var(--brown)'}">${fmt(total)}</span>
+          </div>
+          ${excede?`<div style="font-size:11px;color:var(--rojo);background:var(--rojo-bg);border-radius:8px;padding:8px 10px;margin-top:8px"><i class="ti ti-alert-circle"></i> Te faltan ${fmt(total-saldo)} de saldo. Quita productos o sigue acumulando.</div>`:''}
+          <div style="margin-top:12px"><button class="btn" ${excede?'disabled':''} onclick="solicitarCanje()"><i class="ti ti-gift"></i> Canjear — llega gratis en tu próximo pedido</button></div>
+        </div>`:''}
+        <div class="card">
+          <div class="card-title"><i class="ti ti-shopping-bag"></i> Productos disponibles</div>
+          <p style="font-size:10px;color:var(--muted);margin-bottom:8px"><i class="ti ti-circle-filled" style="color:var(--verde);font-size:8px"></i> Solo se muestran productos con stock disponible</p>
+          <div class="buscador"><i class="ti ti-search"></i><input class="input" placeholder="Buscar producto o marca..." value="${filtroCat}" oninput="filtroCat=this.value;render()"/></div>
+          ${lista.length ? lista.map(p=>{
+            const qty = carrito[p.id]||0;
+            return `<div class="prod">
+              <div class="prod-img" style="background:${MARCA_COLORS[p.marca]||'#ccc'}"><i class="ti ti-bottle"></i></div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.nombre}">${p.nombre}</div>
+                <div style="font-size:10px;color:var(--muted)">${p.marca}</div>
+                <div style="font-size:13px;font-weight:700;color:var(--brown)">${fmt(p.precio)}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px">
+                ${qty>0?`<button class="qty-btn" onclick="cambiarQty('${p.id}',-1)">−</button><span style="font-size:13px;font-weight:700;min-width:16px;text-align:center">${qty}</span>`:''}
+                <button class="qty-btn" style="background:var(--brown);color:#fff;border-color:var(--brown)" onclick="cambiarQty('${p.id}',1)">+</button>
+              </div>
+            </div>`;
+          }).join('') : '<p style="font-size:12px;color:var(--muted)">No hay productos disponibles en este momento — vuelve pronto.</p>'}
+        </div>`;
+    }
+
+    if(tabActual==='canjes'){
+      html = `
+        <div class="card">
+          <div class="card-title"><i class="ti ti-gift"></i> Mis canjes</div>
+          ${RESUMEN.canjes.length ? RESUMEN.canjes.map(x=>renderCanjeRow(x)).join('') : '<p style="font-size:12px;color:var(--muted)">Aún no has canjeado. Ve al catálogo y elige tus productos 💛</p>'}
+        </div>
+        <div class="card" style="background:var(--bl);border-color:rgba(160,104,74,0.25)">
+          <div style="font-size:12px;color:var(--brown-dark);line-height:1.5">
+            <i class="ti ti-truck-delivery" style="color:var(--brown)"></i>
+            Cuando COSÉTIKA aprueba tu canje, los productos se incluyen en tu
+            <b>próxima factura con 100% de descuento</b> y llegan junto con tu pedido.
+          </div>
+        </div>`;
+    }
+
+    shell(html, tabsCliente());
+  }catch(e){
+    shell(`<div class="card"><p style="font-size:13px;color:var(--rojo)"><i class="ti ti-alert-circle"></i> ${e.message}</p></div>`, tabsCliente());
+  }
+}
+
+function cambiarQty(id, delta){
+  carrito[id] = (carrito[id]||0)+delta;
+  if(carrito[id]<=0) delete carrito[id];
+  render();
+}
+
+async function solicitarCanje(){
+  const items = Object.entries(carrito).map(([id,qty])=>({id, qty}));
+  try{
+    await api('/api/cliente/'+sesion.cliente_id+'/canjes', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({items}) });
+    carrito = {};
+    tabActual = 'canjes';
+    toast('Solicitud enviada ✓ COSÉTIKA la aprobará y llegará en tu próximo pedido');
+    render();
+  }catch(e){ toast(e.message); }
+}
+
+// ═══════════════════ INICIO ═══════════════════
+render();
+</script>
+</body>
+</html>
