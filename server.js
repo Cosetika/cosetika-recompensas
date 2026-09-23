@@ -102,6 +102,25 @@ const WC_URL = (process.env.WC_URL || 'https://cosetika.com').replace(/\/$/, '')
 const WC_KEY = process.env.WC_CONSUMER_KEY || '';
 const WC_SECRET = process.env.WC_CONSUMER_SECRET || '';
 
+const crypto = require('crypto');
+
+// ─── CONTRASEÑAS DEL EQUIPO ──────────────────────────────────────────────────
+// La tabla `usuarios` la comparte con el dashboard, y allá las contraseñas pasaron
+// a guardarse cifradas (scrypt con sal por usuario). Comparar el texto plano contra
+// la columna ya no funciona: hay que traer el usuario y verificar aquí.
+function claveCorrecta(guardada, intento){
+  const g = String(guardada || '');
+  const cmp = (a, b) => {
+    const A = Buffer.from(String(a)), B = Buffer.from(String(b));
+    return A.length === B.length && crypto.timingSafeEqual(A, B);   // sin filtrar por tiempo
+  };
+  if (g.startsWith('scrypt$')) {
+    const [, sal] = g.split('$');
+    return cmp(g, 'scrypt$' + sal + '$' + crypto.scryptSync(String(intento), sal, 32).toString('hex'));
+  }
+  return cmp(g, intento);                     // formato antiguo, por si queda alguno
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
@@ -580,9 +599,9 @@ const server = http.createServer(async (req, res) => {
     // 1) equipo del dashboard (misma clave que usan en el panel de ventas)
     try {
       const rU = await pool.query(
-        `SELECT id, nombre, rol FROM usuarios WHERE usuario=$1 AND password=$2 AND activo=true`,
-        [usuario, password]);
-      if (rU.rows.length) {
+        `SELECT id, nombre, rol, password FROM usuarios WHERE usuario=$1 AND activo=true`,
+        [usuario]);
+      if (rU.rows.length && claveCorrecta(rU.rows[0].password, password)) {
         const u = rU.rows[0];
         if (u.rol === 'admin') { json(res, 200, { ok:true, tipo:'admin', nombre: u.nombre }); return; }
         const rP = await pool.query('SELECT nivel, ver_claves FROM recompensas_permisos WHERE usuario_id=$1', [u.id]);
