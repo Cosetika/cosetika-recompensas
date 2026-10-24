@@ -308,7 +308,11 @@ async function cargarSemaforos() {
     let fechaCorte = null, ok = false, ultimoError = null;
     for (const m of marcas) {
       try {
-        const resp = await fetch(`${DASHBOARD_URL}/api/inventario?marca=${encodeURIComponent(m)}`, { headers: { 'Accept': 'application/json' } });
+        // El dashboard exige sesión en toda su API. Esta llave identifica a este
+        // servicio y solo sirve para LEER el inventario; sin ella responde 401 y
+        // nos quedamos sin semáforos (catálogo de canje vacío).
+        const resp = await fetch(`${DASHBOARD_URL}/api/inventario?marca=${encodeURIComponent(m)}`, {
+          headers: { 'Accept': 'application/json', 'x-servicio': process.env.SERVICIO_TOKEN || '' } });
         if (!resp.ok) { ultimoError = `HTTP ${resp.status} consultando Proyección (${m})`; continue; }
         const data = await resp.json();
         (data.productos || []).forEach(p => { if (p.id) porId[p.id] = p.semaforo; });
@@ -363,6 +367,9 @@ function esVisibleCliente(p) {
 
 // ─── SYNC DE COMPRAS: facturas de Contifico → recompensas_compras ────────────
 let syncEnProceso = false;
+// Resultado del último cruce con Contifico, para poder verlo en /api/estado sin
+// tener que mirar los logs.
+let ULTIMO_SYNC = { ok:null, cuando:null };
 
 async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null) {
   if (!API_KEY) return { ok:false, error:'Sin CONTIFICO_API_KEY' };
@@ -402,9 +409,16 @@ async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null) {
     const documentosVistos = new Set();
     let nextUrl = `https://api.contifico.com/sistema/api/v2/documento/?fecha_inicial=${fi}&fecha_final=${ff}&page_size=100`;
     let paginas = 0;
+    let fallo = null;
     while (nextUrl && paginas < 200) {
       const resp = await fetch(nextUrl, { headers: { 'Authorization': API_KEY, 'Accept': 'application/json' } });
-      if (!resp.ok) break;
+      // Antes esto hacía `break` en silencio y la función devolvía ok:true con ceros:
+      // con la clave caducada, las compras dejaban de acreditarse y nadie se enteraba.
+      if (!resp.ok) {
+        fallo = 'Contifico respondió HTTP ' + resp.status
+              + (resp.status === 401 || resp.status === 403 ? ' — revisa CONTIFICO_API_KEY' : '');
+        break;
+      }
       const data = await resp.json();
       for (const d of (data.results || [])) {
         if (d.tipo_registro !== 'CLI') continue;
@@ -446,8 +460,14 @@ async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null) {
       nextUrl = data.next || null;
       paginas++;
     }
-    console.log(`✓ Sync compras (${fi} → ${ff}): ${revisados} facturas de clientes del plan, ${nuevos} nuevas acreditadas`);
     syncEnProceso = false;
+    if (fallo) {
+      console.error('✗ Sync compras: ' + fallo);
+      ULTIMO_SYNC = { ok:false, cuando: new Date().toISOString(), error: fallo };
+      return { ok:false, error: fallo, rango:`${fi} → ${ff}`, revisados, nuevos };
+    }
+    console.log(`✓ Sync compras (${fi} → ${ff}): ${revisados} facturas de clientes del plan, ${nuevos} nuevas acreditadas`);
+    ULTIMO_SYNC = { ok:true, cuando: new Date().toISOString(), rango:`${fi} → ${ff}`, revisados, nuevos };
     return { ok:true, rango:`${fi} → ${ff}`, revisados, nuevos };
   } catch(e) {
     syncEnProceso = false;
@@ -927,6 +947,7 @@ const server = http.createServer(async (req, res) => {
       catalogo: { total: Object.keys(catalogoProductos).length, synced_at: catalogoSyncedAt },
       web: { productos: Object.keys(wooPorSku).length, synced_at: wooSyncedAt, error: wooUltimoError },
       proyeccion: { productos: Object.keys(SEMAFOROS.porId).length, fecha_corte: SEMAFOROS.fecha_corte, synced_at: SEMAFOROS.synced_at, error: SEMAFOROS.error },
+      contifico: ULTIMO_SYNC,
       elegibles_erayba: ELEGIBLES_ERAYBA.size,
       regla: '10% con IVA solo de productos retail (ZIAJA + ERAYBA marcados) · precios PVP web · semáforo Proyección'
     });
