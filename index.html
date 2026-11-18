@@ -94,8 +94,17 @@ function toast(msg){
   window._toastT=setTimeout(()=>{ t.style.display='none'; },3200);
 }
 async function api(url, opts){
+  opts = opts || {};
+  // Cada llamada lleva el token de la sesión; el servidor rechaza las que no lo traen.
+  if(sesion && sesion.token) opts.headers = { ...(opts.headers||{}), 'Authorization': 'Bearer ' + sesion.token };
   const r = await fetch(url, opts);
   const data = await r.json().catch(()=>({ok:false,error:'Respuesta inválida del servidor'}));
+  if(r.status === 401 && data.sesion === false && sesion){
+    // Sesión vencida, o abierta antes de esta versión (sin token): volver al login
+    logout();
+    setTimeout(()=>toast('Tu sesión expiró — vuelve a iniciar sesión'), 50);
+    throw new Error('Sesión expirada');
+  }
   if(!r.ok && data.error) throw new Error(data.error);
   return data;
 }
@@ -143,6 +152,7 @@ function logout(){ sesion=null; sessionStorage.removeItem('recompensas_sesion');
 
 // ═══════════════════ LAYOUT ═══════════════════
 function shell(contenido, tabs){
+  if(!sesion){ renderLogin(); return; }   // la sesión venció mientras cargaba
   const sub = sesion.tipo==='cliente' ? 'Plan de Recompensas' : `Plan de Recompensas · ${sesion.nombre||'Administrador'}`;
   document.getElementById('app').innerHTML = `
     <div class="header">

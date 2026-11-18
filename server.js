@@ -686,6 +686,7 @@ async function initDB() {
 }
 
 initDB()
+  .then(() => cargarSecreto().catch(e => console.error('Error clave de sesiones:', e.message)))
   .then(() => sincronizarCatalogo())
   .then(() => inicializarElegibles())
   .then(() => cargarSemaforos())
@@ -716,19 +717,135 @@ function json(res, code, obj) {
   res.end(JSON.stringify(obj));
 }
 
+// ─── SESIONES (token firmado) ────────────────────────────────────────────────
+// Al iniciar sesión el servidor entrega un token firmado con HMAC. Cada llamada a
+// /api/... debe traerlo en "Authorization: Bearer <token>". Así nadie puede usar
+// las direcciones de administración solo con conocer la URL.
+// La clave de firma se genera una vez y se guarda en recompensas_config
+// (o se toma de SESSION_SECRET si existe), para que las sesiones sobrevivan a un redeploy.
+let SECRETO = process.env.SESSION_SECRET || null;
+const SESION_HORAS = 7 * 24;
+
+async function cargarSecreto() {
+  if (SECRETO) return SECRETO;
+  await pool.query(`CREATE TABLE IF NOT EXISTS recompensas_config (clave VARCHAR(50) PRIMARY KEY, valor TEXT NOT NULL)`);
+  await pool.query(`INSERT INTO recompensas_config(clave, valor) VALUES('session_secret', $1) ON CONFLICT (clave) DO NOTHING`,
+    [crypto.randomBytes(32).toString('hex')]);
+  const r = await pool.query(`SELECT valor FROM recompensas_config WHERE clave='session_secret'`);
+  SECRETO = r.rows[0].valor;
+  return SECRETO;
+}
+
+const b64url = s => Buffer.from(s).toString('base64url');
+function firmar(datos) { return crypto.createHmac('sha256', SECRETO).update(datos).digest('base64url'); }
+
+function crearToken(payload) {
+  const datos = b64url(JSON.stringify({ ...payload, exp: Date.now() + SESION_HORAS * 3600 * 1000 }));
+  return datos + '.' + firmar(datos);
+}
+
+function leerToken(token) {
+  if (!SECRETO || !token || typeof token !== 'string') return null;
+  const [datos, firma] = token.split('.');
+  if (!datos || !firma) return null;
+  const esperada = Buffer.from(firmar(datos)), recibida = Buffer.from(firma);
+  if (esperada.length !== recibida.length || !crypto.timingSafeEqual(esperada, recibida)) return null;
+  try {
+    const p = JSON.parse(Buffer.from(datos, 'base64url').toString());
+    return (p && p.exp > Date.now()) ? p : null;
+  } catch(e) { return null; }
+}
+
+// Valida el token y vuelve a leer los permisos ACTUALES de la base: si se le quita
+// el acceso a alguien o se desactiva un cliente, deja de entrar de inmediato.
+async function autenticar(req) {
+  if (!SECRETO) { try { await cargarSecreto(); } catch(e) { return null; } }
+  const h = req.headers['authorization'] || '';
+  const p = leerToken(h.startsWith('Bearer ') ? h.slice(7) : '');
+  if (!p) return null;
+  if (p.tipo === 'cliente') {
+    const r = await pool.query('SELECT nombre FROM recompensas_clientes WHERE id=$1 AND activo=true', [p.cliente_id]);
+    return r.rows.length ? { tipo:'cliente', cliente_id: p.cliente_id, nombre: r.rows[0].nombre } : null;
+  }
+  if (p.usuario_id) {
+    const r = await pool.query(
+      `SELECT u.nombre, u.rol, p.nivel, p.ver_claves FROM usuarios u
+       LEFT JOIN recompensas_permisos p ON p.usuario_id=u.id
+       WHERE u.id=$1 AND u.activo=true`, [p.usuario_id]);
+    if (!r.rows.length) return null;
+    const u = r.rows[0];
+    if (u.rol === 'admin') return { tipo:'admin', usuario_id: p.usuario_id, nombre: u.nombre, ver_claves: true };
+    if (u.nivel) return { tipo:'staff', usuario_id: p.usuario_id, nombre: u.nombre, nivel: u.nivel, ver_claves: !!u.ver_claves };
+  }
+  return null;
+}
+
+// Qué se necesita para cada dirección de la API. Lo que no está listado queda
+// SOLO para el administrador (por defecto, cerrado).
+function permisoRequerido(metodo, ruta, urlObj) {
+  if (ruta === '/api/push/subscribe') return 'cualquiera';
+  if (ruta === '/api/catalogo') return urlObj.searchParams.get('todos') === '1' ? 'equipo' : 'cualquiera';
+  const mCli = ruta.match(/^\/api\/cliente\/(\d+)\//);
+  if (mCli) return 'cliente:' + mCli[1];
+  if (ruta === '/api/admin/clientes') return metodo === 'POST' ? 'crear' : 'equipo';
+  if (/^\/api\/admin\/clientes\/\d+\/resumen$/.test(ruta)) return 'equipo';
+  if (ruta === '/api/admin/canjes' && metodo === 'GET') return 'equipo';
+  if (ruta === '/api/admin/sync' || ruta === '/api/admin/revisar-pagos') return 'crear';
+  return 'admin';   // equipo (permisos), cambiar clientes, aprobar canjes, elegibles, recalcular, diagnósticos…
+}
+
+function cumplePermiso(ses, req) {
+  if (req === 'cualquiera') return true;
+  if (req === 'admin') return ses.tipo === 'admin';
+  if (req === 'equipo') return ses.tipo === 'admin' || ses.tipo === 'staff';
+  if (req === 'crear') return ses.tipo === 'admin' || (ses.tipo === 'staff' && ses.nivel === 'crear');
+  if (req.startsWith('cliente:')) return ses.tipo === 'cliente' && String(ses.cliente_id) === req.slice(8);
+  return false;
+}
+
+// Freno a intentos repetidos de contraseña: 8 fallos en 15 min por IP → espera.
+const INTENTOS = new Map();
+function ipDe(req) { return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim(); }
+function loginBloqueado(ip) {
+  const x = INTENTOS.get(ip);
+  if (!x) return false;
+  if (Date.now() - x.desde > 15 * 60 * 1000) { INTENTOS.delete(ip); return false; }
+  return x.n >= 8;
+}
+function loginFallido(ip) {
+  const x = INTENTOS.get(ip);
+  if (!x || Date.now() - x.desde > 15 * 60 * 1000) INTENTOS.set(ip, { n: 1, desde: Date.now() });
+  else x.n++;
+}
+
 const server = http.createServer(async (req, res) => {
   const urlObj = new URL(req.url, 'http://localhost');
   const urlPath = urlObj.pathname;
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 
   try {
 
+  // ── PORTERO: toda la API exige sesión salvo login, clave push y estado ──
+  const PUBLICAS = ['/api/login', '/api/push/vapid-key', '/api/estado'];
+  let ses = null;
+  if (urlPath.startsWith('/api/') && !PUBLICAS.includes(urlPath)) {
+    ses = await autenticar(req);
+    if (!ses) { json(res, 401, { ok:false, sesion:false, error:'Tu sesión expiró — vuelve a iniciar sesión' }); return; }
+    if (!cumplePermiso(ses, permisoRequerido(req.method, urlPath, urlObj))) {
+      json(res, 403, { ok:false, error:'No tienes permiso para esta acción' });
+      return;
+    }
+  }
+
   // ── LOGIN: equipo COSÉTIKA (tabla usuarios del dashboard) o cliente del plan ──
   // admin → acceso total · asesora/jefa con permiso → 'ver' o 'crear' (tab Equipo)
   if (urlPath === '/api/login' && req.method === 'POST') {
+    const ip = ipDe(req);
+    if (loginBloqueado(ip)) { json(res, 429, { ok:false, error:'Demasiados intentos fallidos — espera 15 minutos e inténtalo de nuevo' }); return; }
+    await cargarSecreto();
     const { usuario, password } = await bodyJSON(req);
     // 1) equipo del dashboard (misma clave que usan en el panel de ventas)
     try {
@@ -737,9 +854,16 @@ const server = http.createServer(async (req, res) => {
         [usuario]);
       if (rU.rows.length && claveCorrecta(rU.rows[0].password, password)) {
         const u = rU.rows[0];
-        if (u.rol === 'admin') { json(res, 200, { ok:true, tipo:'admin', nombre: u.nombre }); return; }
+        if (u.rol === 'admin') {
+          json(res, 200, { ok:true, tipo:'admin', nombre: u.nombre, token: crearToken({ tipo:'equipo', usuario_id: u.id }) });
+          return;
+        }
         const rP = await pool.query('SELECT nivel, ver_claves FROM recompensas_permisos WHERE usuario_id=$1', [u.id]);
-        if (rP.rows.length) { json(res, 200, { ok:true, tipo:'staff', nivel: rP.rows[0].nivel, ver_claves: !!rP.rows[0].ver_claves, nombre: u.nombre }); return; }
+        if (rP.rows.length) {
+          json(res, 200, { ok:true, tipo:'staff', nivel: rP.rows[0].nivel, ver_claves: !!rP.rows[0].ver_claves, nombre: u.nombre,
+                           token: crearToken({ tipo:'equipo', usuario_id: u.id }) });
+          return;
+        }
         json(res, 401, { ok:false, error:'Tu usuario aún no tiene acceso al Plan de Recompensas — pídeselo a Fernando' });
         return;
       }
@@ -748,7 +872,13 @@ const server = http.createServer(async (req, res) => {
     const rC = await pool.query(
       `SELECT id, nombre, contacto FROM recompensas_clientes WHERE usuario=$1 AND password=$2 AND activo=true`,
       [usuario, password]);
-    if (rC.rows.length) { json(res, 200, { ok:true, tipo:'cliente', cliente_id: rC.rows[0].id, nombre: rC.rows[0].nombre, contacto: rC.rows[0].contacto }); return; }
+    if (rC.rows.length) {
+      const c = rC.rows[0];
+      json(res, 200, { ok:true, tipo:'cliente', cliente_id: c.id, nombre: c.nombre, contacto: c.contacto,
+                       token: crearToken({ tipo:'cliente', cliente_id: c.id }) });
+      return;
+    }
+    loginFallido(ip);
     json(res, 401, { ok:false, error:'Usuario o contraseña incorrectos' });
     return;
   }
@@ -759,8 +889,13 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (urlPath === '/api/push/subscribe' && req.method === 'POST') {
-    const { subscription, tipo, cliente_id, nombre } = await bodyJSON(req);
-    if (!subscription || !subscription.endpoint || !['equipo','cliente'].includes(tipo)) { json(res, 400, { ok:false, error:'Datos inválidos' }); return; }
+    const { subscription } = await bodyJSON(req);
+    // Tipo y cliente salen de la SESIÓN, no del cuerpo: nadie puede suscribirse
+    // a los avisos del equipo o de otra clienta.
+    const tipo = ses.tipo === 'cliente' ? 'cliente' : 'equipo';
+    const cliente_id = ses.tipo === 'cliente' ? ses.cliente_id : null;
+    const nombre = ses.nombre || '';
+    if (!subscription || !subscription.endpoint) { json(res, 400, { ok:false, error:'Datos inválidos' }); return; }
     await pool.query(
       `INSERT INTO recompensas_push(tipo, cliente_id, nombre, endpoint, p256dh, auth)
        VALUES($1,$2,$3,$4,$5,$6)
@@ -870,6 +1005,8 @@ const server = http.createServer(async (req, res) => {
   if (mDet && req.method === 'GET') {
     const resumen = await resumenCliente(parseInt(mDet[1]));
     if (!resumen) { json(res, 404, { ok:false, error:'Cliente no encontrado' }); return; }
+    // La clave del cliente solo viaja a quien tiene permiso de verla (admin o 🔑)
+    if (!ses.ver_claves) delete resumen.cliente.password;
     json(res, 200, resumen);
     return;
   }
