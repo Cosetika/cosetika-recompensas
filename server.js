@@ -371,7 +371,42 @@ let syncEnProceso = false;
 // tener que mirar los logs.
 let ULTIMO_SYNC = { ok:null, cuando:null };
 
-async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null) {
+// ─── ESTADO DE PAGO DE UNA FACTURA (Contifico) ───────────────────────────────
+// Solo las facturas PAGADAS acreditan saldo. Se usa, en este orden, la señal más
+// confiable que traiga el documento:
+//   1) `saldo`  → lo que falta por cobrar (0 = pagada)
+//   2) `cobros` → suma de cobros registrados contra el total
+//   3) `estado` → código de Contifico (C = cobrado, G = pagado; P = pendiente)
+// Si no hay ninguna señal, se asume PENDIENTE (nunca se regala saldo por duda).
+// /api/admin/debug-pagos muestra los campos crudos para verificar esta lectura.
+function estadoPagoFactura(d) {
+  const total = parseFloat(d.total || 0) || 0;
+  const r2 = n => Math.round(n * 100) / 100;
+  if (d.saldo !== undefined && d.saldo !== null && d.saldo !== '' && !isNaN(parseFloat(d.saldo))) {
+    const pend = Math.max(0, parseFloat(d.saldo));
+    return { pagada: pend <= 0.01, pendiente: r2(pend), fuente: 'saldo' };
+  }
+  if (Array.isArray(d.cobros) && d.cobros.length) {
+    const cobrado = d.cobros.reduce((a, c) => a + (parseFloat(c.monto ?? c.valor ?? c.total ?? 0) || 0), 0);
+    const pend = Math.max(0, total - cobrado);
+    return { pagada: pend <= 0.01, pendiente: r2(pend), fuente: 'cobros' };
+  }
+  const e = String(d.estado || '').trim().toUpperCase();
+  if (e) {
+    const pagada = ['C', 'G', 'COBRADO', 'PAGADO', 'PAGADA'].includes(e);
+    return { pagada, pendiente: pagada ? 0 : r2(total), fuente: 'estado:' + e };
+  }
+  return { pagada: false, pendiente: r2(total), fuente: 'sin_dato' };
+}
+
+// Espera (hasta ~2 min) a que termine un sync en curso, para no chocar con él.
+async function esperarSync(maxMs = 120000) {
+  const t0 = Date.now();
+  while (syncEnProceso && Date.now() - t0 < maxMs) await new Promise(r => setTimeout(r, 500));
+}
+
+// notificar=false en backfills y recálculos, para no mandar avisos de facturas viejas.
+async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null, notificar = true) {
   if (!API_KEY) return { ok:false, error:'Sin CONTIFICO_API_KEY' };
   if (syncEnProceso) return { ok:false, error:'Sync ya en proceso' };
   if (Object.keys(catalogoProductos).length === 0) return { ok:false, error:'Catálogo aún no cargado — reintenta en un minuto' };
@@ -405,7 +440,7 @@ async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null) {
     }
     const fi = fmtDateEC(inicio), ff = fmtDateEC(hoy);
 
-    let nuevos = 0, revisados = 0;
+    let nuevos = 0, revisados = 0, pagadas = 0, pendientes = 0;
     const documentosVistos = new Set();
     let nextUrl = `https://api.contifico.com/sistema/api/v2/documento/?fecha_inicial=${fi}&fecha_final=${ff}&page_size=100`;
     let paginas = 0;
@@ -446,16 +481,49 @@ async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null) {
           montoBase += base * (1 + (isNaN(ivaPct) ? 15 : ivaPct) / 100);
         }
         montoBase = Math.round(montoBase * 100) / 100;
-        if (montoBase <= 0) continue; // factura sin productos elegibles → sin saldo
+        // Se guardan TODAS las facturas del cliente (también las que no tienen
+        // productos retail, con recompensa 0) para mostrarlas en el listado.
         const recompensa = Math.round(montoBase * REGLA_PCT * 100)/100;
+        const totalFactura = Math.round((parseFloat(d.total || 0) || 0) * 100) / 100;
+        const pago = estadoPagoFactura(d);
         revisados++;
+        if (pago.pagada) pagadas++; else pendientes++;
+        // `prev` lee la fila ANTES del upsert, para saber si la factura acaba de pagarse.
         const r = await pool.query(
-          `INSERT INTO recompensas_compras(cliente_id, documento_id, documento, fecha, subtotal, recompensa)
-           VALUES($1,$2,$3,$4,$5,$6)
-           ON CONFLICT (cliente_id, documento_id) DO NOTHING`,
-          [cli.id, docKey, d.documento || '', fechaSQL, montoBase, recompensa]
+          `WITH prev AS (
+             SELECT estado_pago, saldo_pendiente FROM recompensas_compras WHERE cliente_id=$1 AND documento_id=$2
+           )
+           INSERT INTO recompensas_compras(cliente_id, documento_id, documento, fecha, subtotal, recompensa,
+                                           total_factura, estado_pago, saldo_pendiente, fuente_pago, pagada_at)
+           VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, CASE WHEN $11::boolean THEN NOW() ELSE NULL END)
+           ON CONFLICT (cliente_id, documento_id) DO UPDATE SET
+             documento=EXCLUDED.documento, fecha=EXCLUDED.fecha,
+             subtotal=EXCLUDED.subtotal, recompensa=EXCLUDED.recompensa,
+             total_factura=EXCLUDED.total_factura, estado_pago=EXCLUDED.estado_pago,
+             saldo_pendiente=EXCLUDED.saldo_pendiente, fuente_pago=EXCLUDED.fuente_pago,
+             pagada_at=CASE WHEN EXCLUDED.estado_pago='pagada'
+                            THEN COALESCE(recompensas_compras.pagada_at, NOW()) ELSE NULL END
+           RETURNING (SELECT estado_pago FROM prev) AS prev_estado,
+                     (SELECT saldo_pendiente FROM prev) AS prev_saldo,
+                     (xmax = 0) AS insertada`,
+          [cli.id, docKey, d.documento || '', fechaSQL, montoBase, recompensa,
+           totalFactura, pago.pagada ? 'pagada' : 'pendiente', pago.pendiente, pago.fuente, pago.pagada]
         );
-        if (r.rowCount > 0) nuevos++;
+        const row = r.rows[0] || {};
+        if (row.insertada) nuevos++;
+        // Aviso a la clienta cuando se acredita saldo: factura nueva ya pagada, o una
+        // que vimos pendiente y ahora está pagada. (prev_saldo NULL = fila antigua,
+        // anterior a este control → no se avisa para no mandar avisos viejos.)
+        const recienPagada = pago.pagada && recompensa > 0 && (
+          row.insertada || (row.prev_estado === 'pendiente' && row.prev_saldo !== null)
+        );
+        if (notificar && recienPagada) {
+          pushCliente(cli.id, {
+            title: `💛 +$${recompensa.toFixed(2)} en tu saldo`,
+            body: `Se confirmó el pago de tu factura ${d.documento || ''} — ya puedes usar tu saldo`,
+            tag: 'pago-' + docKey, url: '/'
+          }).catch(()=>{});
+        }
       }
       nextUrl = data.next || null;
       paginas++;
@@ -466,9 +534,9 @@ async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null) {
       ULTIMO_SYNC = { ok:false, cuando: new Date().toISOString(), error: fallo };
       return { ok:false, error: fallo, rango:`${fi} → ${ff}`, revisados, nuevos };
     }
-    console.log(`✓ Sync compras (${fi} → ${ff}): ${revisados} facturas de clientes del plan, ${nuevos} nuevas acreditadas`);
-    ULTIMO_SYNC = { ok:true, cuando: new Date().toISOString(), rango:`${fi} → ${ff}`, revisados, nuevos };
-    return { ok:true, rango:`${fi} → ${ff}`, revisados, nuevos };
+    console.log(`✓ Sync compras (${fi} → ${ff}): ${revisados} facturas de clientes del plan (${pagadas} pagadas, ${pendientes} pendientes), ${nuevos} nuevas`);
+    ULTIMO_SYNC = { ok:true, cuando: new Date().toISOString(), rango:`${fi} → ${ff}`, revisados, nuevos, pagadas, pendientes };
+    return { ok:true, rango:`${fi} → ${ff}`, revisados, nuevos, pagadas, pendientes };
   } catch(e) {
     syncEnProceso = false;
     console.error('Error sync compras:', e.message);
@@ -476,33 +544,70 @@ async function sincronizarCompras(diasAtras = 3, clienteIdFiltro = null) {
   }
 }
 
+// ─── SEGUIMIENTO DE FACTURAS PENDIENTES ──────────────────────────────────────
+// El sync de cada minuto solo mira facturas emitidas ayer y hoy; una factura a
+// crédito que se paga semanas después no aparecería ahí. Esto vuelve a revisar
+// en Contifico desde la factura pendiente más antigua (máximo 180 días atrás)
+// para detectar los pagos y acreditar el saldo.
+async function revisarPendientes() {
+  try {
+    const r = await pool.query(
+      `SELECT MIN(co.fecha) AS desde FROM recompensas_compras co
+       JOIN recompensas_clientes c ON c.id=co.cliente_id
+       WHERE co.estado_pago='pendiente' AND c.activo=true`);
+    const desde = r.rows[0] && r.rows[0].desde;
+    if (!desde) return { ok:true, msg:'Sin facturas pendientes' };
+    const dias = Math.ceil((Date.now() - new Date(desde).getTime()) / 86400000) + 1;
+    await esperarSync();
+    return await sincronizarCompras(Math.min(Math.max(dias, 2), 180));
+  } catch(e) {
+    console.error('Error revisando pendientes:', e.message);
+    return { ok:false, error: e.message };
+  }
+}
+
 // ─── SALDOS ──────────────────────────────────────────────────────────────────
+// Saldo generado = solo facturas PAGADAS. Las pendientes se muestran aparte
+// como "por confirmar" y no se pueden canjear hasta que se paguen.
 async function resumenCliente(clienteId) {
   const rCli = await pool.query(
     `SELECT id, ruc, nombre, contacto, ciudad, usuario, password, email, TO_CHAR(desde,'YYYY-MM-DD') AS desde, activo
      FROM recompensas_clientes WHERE id=$1`, [clienteId]);
   if (!rCli.rows.length) return null;
   const rComp = await pool.query(
-    `SELECT documento, TO_CHAR(fecha,'YYYY-MM-DD') AS fecha, subtotal, recompensa
-     FROM recompensas_compras WHERE cliente_id=$1 ORDER BY fecha DESC, id DESC LIMIT 200`, [clienteId]);
+    `SELECT documento, TO_CHAR(fecha,'YYYY-MM-DD') AS fecha, subtotal, recompensa,
+            total_factura, estado_pago, saldo_pendiente,
+            TO_CHAR((pagada_at AT TIME ZONE current_setting('TimeZone')) AT TIME ZONE 'America/Guayaquil','YYYY-MM-DD') AS pagada_fecha
+     FROM recompensas_compras WHERE cliente_id=$1 ORDER BY fecha DESC, id DESC LIMIT 300`, [clienteId]);
   const rCanjes = await pool.query(
-    `SELECT id, items, total, estado, TO_CHAR(created_at AT TIME ZONE 'America/Guayaquil','YYYY-MM-DD') AS fecha
+    `SELECT id, items, total, estado, TO_CHAR((created_at AT TIME ZONE current_setting('TimeZone')) AT TIME ZONE 'America/Guayaquil','YYYY-MM-DD') AS fecha
      FROM recompensas_canjes WHERE cliente_id=$1 ORDER BY id DESC LIMIT 100`, [clienteId]);
   const rTot = await pool.query(
-    `SELECT COALESCE((SELECT SUM(recompensa) FROM recompensas_compras WHERE cliente_id=$1),0) AS generado,
-            COALESCE((SELECT SUM(subtotal) FROM recompensas_compras WHERE cliente_id=$1),0) AS compras,
+    `SELECT COALESCE((SELECT SUM(recompensa) FROM recompensas_compras WHERE cliente_id=$1 AND estado_pago='pagada'),0) AS generado,
+            COALESCE((SELECT SUM(recompensa) FROM recompensas_compras WHERE cliente_id=$1 AND estado_pago='pendiente'),0) AS por_confirmar,
+            COALESCE((SELECT SUM(subtotal) FROM recompensas_compras WHERE cliente_id=$1 AND estado_pago='pagada'),0) AS compras,
+            COALESCE((SELECT SUM(total_factura) FROM recompensas_compras WHERE cliente_id=$1),0) AS facturado,
+            COALESCE((SELECT SUM(COALESCE(saldo_pendiente,total_factura)) FROM recompensas_compras WHERE cliente_id=$1 AND estado_pago='pendiente'),0) AS por_cobrar,
             COALESCE((SELECT SUM(total) FROM recompensas_canjes WHERE cliente_id=$1 AND estado!='rechazado'),0) AS canjeado`,
     [clienteId]);
   const t = rTot.rows[0];
-  const generado = Math.round(parseFloat(t.generado)*100)/100;
-  const canjeado = Math.round(parseFloat(t.canjeado)*100)/100;
+  const r2 = v => Math.round(parseFloat(v || 0)*100)/100;
+  const generado = r2(t.generado);
+  const canjeado = r2(t.canjeado);
   return {
     cliente: rCli.rows[0],
-    compras_total: Math.round(parseFloat(t.compras)*100)/100,
-    saldo_generado: generado,
+    compras_total: r2(t.compras),           // compras retail PAGADAS (base del saldo)
+    facturado_total: r2(t.facturado),       // todo lo facturado, pagado o no
+    por_cobrar: r2(t.por_cobrar),           // lo que falta pagar en facturas pendientes
+    saldo_generado: generado,               // solo facturas pagadas
+    saldo_por_confirmar: r2(t.por_confirmar), // se acredita cuando se paguen
     saldo_canjeado: canjeado,
     saldo_disponible: Math.round((generado - canjeado)*100)/100,
-    compras: rComp.rows.map(x => ({...x, subtotal: parseFloat(x.subtotal), recompensa: parseFloat(x.recompensa)})),
+    compras: rComp.rows.map(x => ({...x,
+      subtotal: parseFloat(x.subtotal), recompensa: parseFloat(x.recompensa),
+      total_factura: x.total_factura === null ? null : parseFloat(x.total_factura),
+      saldo_pendiente: x.saldo_pendiente === null ? null : parseFloat(x.saldo_pendiente)
+    })),
     canjes: rCanjes.rows.map(x => ({...x, total: parseFloat(x.total), items: JSON.parse(x.items||'[]')}))
   };
 }
@@ -553,6 +658,13 @@ async function initDB() {
       );
       ALTER TABLE recompensas_permisos ADD COLUMN IF NOT EXISTS ver_claves BOOLEAN DEFAULT false;
       ALTER TABLE recompensas_clientes ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+      -- Estado de pago: solo 'pagada' acredita saldo. Las filas anteriores a este
+      -- control quedan 'pendiente' hasta que revisarPendientes() las confirme.
+      ALTER TABLE recompensas_compras ADD COLUMN IF NOT EXISTS total_factura NUMERIC(12,2);
+      ALTER TABLE recompensas_compras ADD COLUMN IF NOT EXISTS estado_pago VARCHAR(12) NOT NULL DEFAULT 'pendiente';
+      ALTER TABLE recompensas_compras ADD COLUMN IF NOT EXISTS saldo_pendiente NUMERIC(12,2);
+      ALTER TABLE recompensas_compras ADD COLUMN IF NOT EXISTS fuente_pago VARCHAR(30);
+      ALTER TABLE recompensas_compras ADD COLUMN IF NOT EXISTS pagada_at TIMESTAMP;
       CREATE TABLE IF NOT EXISTS recompensas_elegibles (
         id SERIAL PRIMARY KEY,
         producto_id VARCHAR(100) UNIQUE NOT NULL,
@@ -579,8 +691,10 @@ initDB()
   .then(() => cargarSemaforos())
   .then(() => sincronizarWoo())
   .then(() => sincronizarCompras(3))
+  .then(() => revisarPendientes())
   .catch(e => console.error('Error init:', e.message));
 setInterval(() => sincronizarCompras(1).catch(e=>console.error(e)), 60 * 1000);            // facturas del día cada 60 segundos
+setInterval(() => revisarPendientes().catch(e=>console.error(e)), 30 * 60 * 1000);         // pagos de facturas pendientes cada 30 min
 setInterval(() => sincronizarCompras(7).catch(e=>console.error(e)), 6 * 60 * 60 * 1000);   // repaso de la semana cada 6 h
 setInterval(() => cargarSemaforos().catch(e=>console.error(e)), 15 * 60 * 1000);           // semáforo Proyección cada 15 min
 setInterval(() => sincronizarCatalogo().catch(e=>console.error(e)), 24 * 60 * 60 * 1000);  // catálogo diario
@@ -697,9 +811,11 @@ const server = http.createServer(async (req, res) => {
     const r = await pool.query(`
       SELECT c.id, c.ruc, c.nombre, c.contacto, c.ciudad, c.usuario, c.activo,
              TO_CHAR(c.desde,'YYYY-MM-DD') AS desde,
-             COALESCE(SUM(co.subtotal),0) AS compras,
-             COALESCE(SUM(co.recompensa),0) AS generado,
+             COALESCE(SUM(co.subtotal) FILTER (WHERE co.estado_pago='pagada'),0) AS compras,
+             COALESCE(SUM(co.recompensa) FILTER (WHERE co.estado_pago='pagada'),0) AS generado,
+             COALESCE(SUM(co.recompensa) FILTER (WHERE co.estado_pago='pendiente'),0) AS por_confirmar,
              COUNT(co.id) AS num_facturas,
+             COUNT(co.id) FILTER (WHERE co.estado_pago='pendiente') AS facturas_pendientes,
              COALESCE((SELECT SUM(total) FROM recompensas_canjes k WHERE k.cliente_id=c.id AND k.estado!='rechazado'),0) AS canjeado
       FROM recompensas_clientes c
       LEFT JOIN recompensas_compras co ON co.cliente_id=c.id
@@ -707,6 +823,7 @@ const server = http.createServer(async (req, res) => {
     json(res, 200, r.rows.map(x => ({
       ...x,
       compras: parseFloat(x.compras), generado: parseFloat(x.generado),
+      por_confirmar: parseFloat(x.por_confirmar), facturas_pendientes: parseInt(x.facturas_pendientes),
       canjeado: parseFloat(x.canjeado), num_facturas: parseInt(x.num_facturas),
       saldo: Math.round((parseFloat(x.generado)-parseFloat(x.canjeado))*100)/100
     })));
@@ -725,7 +842,7 @@ const server = http.createServer(async (req, res) => {
         [ruc.trim(), nombre.trim(), contacto||null, ciudad||null, usuario.trim(), password, desde||null, (email||'').trim()||null]);
       const nuevoId = r.rows[0].id;
       // Backfill en background desde su fecha de inicio (si es hoy, casi instantáneo)
-      sincronizarCompras(0, nuevoId).catch(e=>console.error(e));
+      esperarSync().then(() => sincronizarCompras(0, nuevoId, false)).catch(e=>console.error(e));
       json(res, 200, { ok:true, id: nuevoId });
     } catch(e) {
       if ((e.message||'').includes('duplicate')) json(res, 400, { ok:false, error:'Ya existe un cliente con ese RUC o ese usuario' });
@@ -761,8 +878,8 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/api/admin/canjes' && req.method === 'GET') {
     const estado = urlObj.searchParams.get('estado');
     const r = estado
-      ? await pool.query(`SELECT k.*, c.nombre AS cliente_nombre, TO_CHAR(k.created_at AT TIME ZONE 'America/Guayaquil','YYYY-MM-DD') AS fecha FROM recompensas_canjes k JOIN recompensas_clientes c ON c.id=k.cliente_id WHERE k.estado=$1 ORDER BY k.id DESC`, [estado])
-      : await pool.query(`SELECT k.*, c.nombre AS cliente_nombre, TO_CHAR(k.created_at AT TIME ZONE 'America/Guayaquil','YYYY-MM-DD') AS fecha FROM recompensas_canjes k JOIN recompensas_clientes c ON c.id=k.cliente_id ORDER BY k.id DESC LIMIT 200`);
+      ? await pool.query(`SELECT k.*, c.nombre AS cliente_nombre, TO_CHAR((k.created_at AT TIME ZONE current_setting('TimeZone')) AT TIME ZONE 'America/Guayaquil','YYYY-MM-DD') AS fecha FROM recompensas_canjes k JOIN recompensas_clientes c ON c.id=k.cliente_id WHERE k.estado=$1 ORDER BY k.id DESC`, [estado])
+      : await pool.query(`SELECT k.*, c.nombre AS cliente_nombre, TO_CHAR((k.created_at AT TIME ZONE current_setting('TimeZone')) AT TIME ZONE 'America/Guayaquil','YYYY-MM-DD') AS fecha FROM recompensas_canjes k JOIN recompensas_clientes c ON c.id=k.cliente_id ORDER BY k.id DESC LIMIT 200`);
     json(res, 200, r.rows.map(x => ({...x, total: parseFloat(x.total), items: JSON.parse(x.items||'[]')})));
     return;
   }
@@ -815,8 +932,11 @@ const server = http.createServer(async (req, res) => {
     const rCli = await pool.query('SELECT id, nombre FROM recompensas_clientes WHERE activo=true ORDER BY id');
     const resultados = [];
     for (const c of rCli.rows) {
+      // Esperar a que termine el sync automático: si no, el borrado quedaba sin
+      // re-acreditar ("Sync ya en proceso") y el cliente se quedaba en $0.
+      await esperarSync();
       await pool.query('DELETE FROM recompensas_compras WHERE cliente_id=$1', [c.id]);
-      const r = await sincronizarCompras(0, c.id);
+      const r = await sincronizarCompras(0, c.id, false);
       resultados.push({ cliente: c.nombre, ...r });
     }
     json(res, 200, { ok:true, clientes: resultados.length, resultados });
@@ -929,6 +1049,48 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── ADMIN: revisar ya los pagos de facturas pendientes ──
+  if (urlPath === '/api/admin/revisar-pagos' && req.method === 'GET') {
+    await esperarSync();
+    json(res, 200, await revisarPendientes());
+    return;
+  }
+
+  // ── DEBUG: cómo trae Contifico el estado de pago de las facturas ──
+  // Muestra, para las últimas facturas (FAC) de los clientes del plan, los campos
+  // de pago tal como llegan y cómo los interpreta la app. Sirve para confirmar
+  // que estadoPagoFactura() lee bien la cuenta de COSÉTIKA.
+  if (urlPath === '/api/admin/debug-pagos' && req.method === 'GET') {
+    const dias = Math.min(parseInt(urlObj.searchParams.get('dias')) || 45, 180);
+    const rCli = await pool.query('SELECT ruc FROM recompensas_clientes WHERE activo=true');
+    const rucs = new Set();
+    rCli.rows.forEach(c => { const id = c.ruc.trim(); rucs.add(id); if (/^\d{10}$/.test(id)) rucs.add(id+'001'); if (/^\d{10}001$/.test(id)) rucs.add(id.slice(0,10)); });
+    const hoy = nowEC(); const ini = new Date(hoy); ini.setDate(ini.getDate() - dias);
+    let nextUrl = `https://api.contifico.com/sistema/api/v2/documento/?fecha_inicial=${fmtDateEC(ini)}&fecha_final=${fmtDateEC(hoy)}&page_size=100`;
+    const delPlan = [], otras = []; let paginas = 0, campos = null;
+    const PAGO = /saldo|estado|cobro|pag|venc|credito|crédito|forma/i;
+    const resumir = d => {
+      const crudo = {};
+      Object.keys(d).forEach(k => { if (PAGO.test(k)) crudo[k] = Array.isArray(d[k]) ? d[k].slice(0,3) : d[k]; });
+      return { documento: d.documento, fecha: d.fecha_emision, total: d.total, campos_pago: crudo, lectura_app: estadoPagoFactura(d) };
+    };
+    while (nextUrl && paginas < 40 && delPlan.length < 8) {
+      const resp = await fetch(nextUrl, { headers: { 'Authorization': API_KEY, 'Accept': 'application/json' } });
+      if (!resp.ok) { json(res, 200, { ok:false, error:'Contifico HTTP ' + resp.status }); return; }
+      const data = await resp.json();
+      for (const d of (data.results || [])) {
+        if (d.tipo_registro !== 'CLI' || d.anulado || d.tipo_documento !== 'FAC') continue;
+        if (!campos) campos = Object.keys(d);
+        const ruc = ((d.cliente?.ruc || d.cliente?.cedula) || '').trim();
+        if (rucs.has(ruc)) delPlan.push(resumir(d));
+        else if (otras.length < 3) otras.push(resumir(d));
+      }
+      nextUrl = data.next || null; paginas++;
+    }
+    json(res, 200, { ok:true, dias, campos_del_documento: campos, facturas_clientes_plan: delPlan, ejemplos_otras_facturas: otras });
+    return;
+  }
+
   // ── DEBUG: campos crudos del producto de Contifico (para ajustar el precio) ──
   if (urlPath === '/api/debug/producto-campos' && req.method === 'GET') {
     json(res, 200, {
@@ -949,7 +1111,7 @@ const server = http.createServer(async (req, res) => {
       proyeccion: { productos: Object.keys(SEMAFOROS.porId).length, fecha_corte: SEMAFOROS.fecha_corte, synced_at: SEMAFOROS.synced_at, error: SEMAFOROS.error },
       contifico: ULTIMO_SYNC,
       elegibles_erayba: ELEGIBLES_ERAYBA.size,
-      regla: '10% con IVA solo de productos retail (ZIAJA + ERAYBA marcados) · precios PVP web · semáforo Proyección'
+      regla: '10% con IVA solo de productos retail (ZIAJA + ERAYBA marcados) · solo facturas PAGADAS · precios PVP web · semáforo Proyección'
     });
     return;
   }
